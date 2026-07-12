@@ -8,13 +8,13 @@ import (
 )
 
 var (
-	ErrEmailTaken         = errors.New("auth: email already registered")
-	ErrInvalidCredentials = errors.New("auth: invalid email or password")
+	ErrEmailTaken         = errors.New("auth: email đã được đăng ký")
+	ErrInvalidCredentials = errors.New("auth: email hoặc mật khẩu không đúng")
 )
 
-// PasswordHasher and TokenIssuer are ports: the service depends only on
-// these interfaces, never on bcrypt/jwt directly. internal/platform/security
-// provides the concrete implementations wired in main.go.
+// PasswordHasher và TokenIssuer là các port: service chỉ phụ thuộc vào
+// interface, không phụ thuộc trực tiếp bcrypt/jwt. internal/platform/security
+// cung cấp implementation cụ thể, được wire ở main.go.
 type PasswordHasher interface {
 	Hash(plain string) (string, error)
 	Compare(hash, plain string) error
@@ -41,7 +41,7 @@ type RegisterInput struct {
 	Role     user.Role
 }
 
-// Register implements US1.1.
+// Register hiện thực US1.1.
 func (s *Service) Register(ctx context.Context, in RegisterInput) (*user.User, error) {
 	existing, err := s.users.FindByEmail(ctx, in.Email)
 	if err != nil && !errors.Is(err, user.ErrNotFound) {
@@ -73,7 +73,7 @@ type LoginInput struct {
 	Password string
 }
 
-// Login implements US1.2, returning a signed JWT on success.
+// Login hiện thực US1.2, trả về JWT đã ký nếu đăng nhập thành công.
 func (s *Service) Login(ctx context.Context, in LoginInput) (string, error) {
 	u, err := s.users.FindByEmail(ctx, in.Email)
 	if err != nil {

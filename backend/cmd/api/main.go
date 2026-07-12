@@ -33,21 +33,21 @@ func main() {
 	ctx := context.Background()
 	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatal("failed to connect to database", zap.Error(err))
+		log.Fatal("kết nối database thất bại", zap.Error(err))
 	}
 	defer pool.Close()
 
-	// infrastructure
+	// tầng infrastructure
 	userRepo := postgres.NewUserRepository(pool)
 	courseRepo := postgres.NewCourseRepository(pool)
 	hasher := security.NewBcryptHasher()
 	tokens := security.NewJWTIssuer(cfg.JWTSecret, 24*time.Hour)
 
-	// service (application) layer
+	// tầng service (application)
 	authSvc := authservice.NewService(userRepo, hasher, tokens)
 	courseSvc := courseservice.NewService(courseRepo)
 
-	// HTTP layer
+	// tầng HTTP
 	authHandler := handler.NewAuthHandler(authSvc, log)
 	courseHandler := handler.NewCourseHandler(courseSvc, log)
 
@@ -64,8 +64,8 @@ func main() {
 		WriteTimeout: 10 * time.Second,
 	}
 
-	log.Info("starting EduConnect LMS API", zap.String("port", cfg.Port), zap.String("env", cfg.Env))
+	log.Info("khởi động EduConnect LMS API", zap.String("port", cfg.Port), zap.String("env", cfg.Env))
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatal("server error", zap.Error(err))
+		log.Fatal("lỗi server", zap.Error(err))
 	}
 }

@@ -20,8 +20,8 @@ type CreateInput struct {
 	TeacherID   uint
 }
 
-// Create implements US2.1 (Giảng viên tạo khóa học). New courses always
-// start as Draft — SubmitForReview/Approve are separate operations.
+// Create hiện thực US2.1 (Giảng viên tạo khóa học). Khóa học mới luôn
+// bắt đầu ở Draft — SubmitForReview/Approve là 2 thao tác riêng biệt.
 func (s *Service) Create(ctx context.Context, in CreateInput) (*course.Course, error) {
 	c, err := course.NewCourse(in.Title, in.Description, in.TeacherID)
 	if err != nil {
@@ -33,8 +33,8 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*course.Course, e
 	return c, nil
 }
 
-// Search implements US3.1 (Học viên tìm kiếm khóa học) — only Approved
-// courses are returned, enforced by the repository query.
+// Search hiện thực US3.1 (Học viên tìm kiếm khóa học) — chỉ khóa học
+// đã Approved mới được trả về, thực thi bởi query trong repository.
 func (s *Service) Search(ctx context.Context, keyword string) ([]*course.Course, error) {
 	return s.courses.Search(ctx, keyword)
 }
@@ -43,16 +43,16 @@ func (s *Service) ListByTeacher(ctx context.Context, teacherID uint) ([]*course.
 	return s.courses.ListByTeacher(ctx, teacherID)
 }
 
-// SubmitForReview lets the owning teacher move a Draft course to
-// PendingReview so it appears in the admin approval queue (still part of
-// US2.1's authoring flow, precedes US2.3).
+// SubmitForReview cho phép giảng viên sở hữu khóa học chuyển nó từ Draft
+// sang PendingReview để xuất hiện trong hàng chờ duyệt của admin (vẫn thuộc
+// luồng soạn thảo của US2.1, diễn ra trước US2.3).
 func (s *Service) SubmitForReview(ctx context.Context, courseID, teacherID uint) (*course.Course, error) {
 	c, err := s.courses.FindByID(ctx, courseID)
 	if err != nil {
 		return nil, err
 	}
 	if c.TeacherID() != teacherID {
-		return nil, course.ErrNotFound // do not leak existence of other teachers' courses
+		return nil, course.ErrNotFound // không tiết lộ sự tồn tại của khóa học người khác
 	}
 	c.SubmitForReview()
 	if err := s.courses.Update(ctx, c); err != nil {
@@ -61,8 +61,8 @@ func (s *Service) SubmitForReview(ctx context.Context, courseID, teacherID uint)
 	return c, nil
 }
 
-// Approve implements US2.3 (Quản trị viên duyệt khóa học). It only succeeds
-// for courses already in PendingReview — enforced by course.Course.Approve.
+// Approve hiện thực US2.3 (Quản trị viên duyệt khóa học). Chỉ thành công
+// với khóa học đang ở PendingReview — được đảm bảo bởi course.Course.Approve.
 func (s *Service) Approve(ctx context.Context, courseID uint) (*course.Course, error) {
 	c, err := s.courses.FindByID(ctx, courseID)
 	if err != nil {

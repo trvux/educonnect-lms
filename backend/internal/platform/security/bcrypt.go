@@ -2,7 +2,7 @@ package security
 
 import "golang.org/x/crypto/bcrypt"
 
-// BcryptHasher implements service/auth.PasswordHasher.
+// BcryptHasher hiện thực service/auth.PasswordHasher.
 type BcryptHasher struct {
 	Cost int
 }

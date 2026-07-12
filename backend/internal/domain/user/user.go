@@ -25,19 +25,19 @@ func (r Role) Valid() bool {
 }
 
 var (
-	ErrInvalidEmail      = errors.New("user: invalid email")
-	ErrInvalidRole       = errors.New("user: invalid role")
-	ErrEmptyFullName     = errors.New("user: full name is required")
-	ErrEmptyPasswordHash = errors.New("user: password hash is required")
-	ErrInactive          = errors.New("user: account is deactivated")
-	ErrNotFound          = errors.New("user: not found")
+	ErrInvalidEmail      = errors.New("user: email không hợp lệ")
+	ErrInvalidRole       = errors.New("user: vai trò không hợp lệ")
+	ErrEmptyFullName     = errors.New("user: họ tên là bắt buộc")
+	ErrEmptyPasswordHash = errors.New("user: password hash là bắt buộc")
+	ErrInactive          = errors.New("user: tài khoản đã bị khoá")
+	ErrNotFound          = errors.New("user: không tìm thấy")
 )
 
 var emailPattern = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 
-// User is the aggregate root for account & authorization (Epic 1).
-// Fields are private: all state changes must go through behavior methods
-// so invariants can never be bypassed by outer layers.
+// User là aggregate root cho quản lý tài khoản & phân quyền (Epic 1).
+// Các field để private: mọi thay đổi trạng thái phải đi qua behavior method
+// để invariant không bao giờ bị bypass từ tầng ngoài.
 type User struct {
 	id           uint
 	email        string
@@ -49,8 +49,8 @@ type User struct {
 	updatedAt    time.Time
 }
 
-// NewUser creates a brand-new account (US1.1). Password hash is set separately
-// via SetPasswordHash so the domain never depends on a concrete hashing library.
+// NewUser tạo mới một tài khoản (US1.1). Password hash được set riêng
+// qua SetPasswordHash để domain không phụ thuộc trực tiếp vào thư viện hash cụ thể.
 func NewUser(email, fullName string, role Role) (*User, error) {
 	if !emailPattern.MatchString(email) {
 		return nil, ErrInvalidEmail
@@ -72,9 +72,9 @@ func NewUser(email, fullName string, role Role) (*User, error) {
 	}, nil
 }
 
-// Rehydrate reconstructs a User from persisted data. It trusts the storage
-// layer (data was already valid when it was written) and is only meant to be
-// called from repository implementations.
+// Rehydrate dựng lại 1 User từ dữ liệu đã lưu trong DB. Hàm này tin tưởng
+// tầng lưu trữ (dữ liệu đã hợp lệ từ lúc ghi xuống), chỉ nên gọi từ
+// các repository implementation.
 func Rehydrate(id uint, email, passwordHash, fullName string, role Role, active bool, createdAt, updatedAt time.Time) *User {
 	return &User{
 		id:           id,
@@ -97,7 +97,7 @@ func (u *User) SetPasswordHash(hash string) error {
 	return nil
 }
 
-// Deactivate is used by US1.3 (Admin khoá tài khoản).
+// Deactivate dùng cho US1.3 (Admin khoá tài khoản vi phạm).
 func (u *User) Deactivate() {
 	u.active = false
 	u.updatedAt = time.Now().UTC()
@@ -108,7 +108,7 @@ func (u *User) Activate() {
 	u.updatedAt = time.Now().UTC()
 }
 
-// CanLogin enforces the account-must-be-active invariant used by the auth service (US1.2).
+// CanLogin đảm bảo invariant "tài khoản phải active mới login được", dùng bởi auth service (US1.2).
 func (u *User) CanLogin() error {
 	if !u.active {
 		return ErrInactive
@@ -127,9 +127,9 @@ func (u *User) Active() bool         { return u.active }
 func (u *User) CreatedAt() time.Time { return u.createdAt }
 func (u *User) UpdatedAt() time.Time { return u.updatedAt }
 
-// Repository is the port the service layer depends on. It is implemented by
-// internal/repository/postgres (dependency inversion: domain defines the
-// contract, infrastructure satisfies it).
+// Repository là port mà tầng service phụ thuộc vào, được implement bởi
+// internal/repository/postgres (dependency inversion: domain định nghĩa
+// contract, infrastructure hiện thực contract đó).
 type Repository interface {
 	Create(ctx context.Context, u *User) error
 	FindByEmail(ctx context.Context, email string) (*User, error)

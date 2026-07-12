@@ -1,6 +1,6 @@
-// Package middleware holds chi middleware shared across handlers: JWT
-// verification and role-based access control (used by US1.3's RBAC and by
-// teacher/admin-only endpoints such as course creation and approval).
+// Package middleware chứa các chi middleware dùng chung cho handler: xác
+// thực JWT và kiểm soát truy cập theo vai trò (dùng cho RBAC của US1.3 và
+// các endpoint chỉ dành cho teacher/admin như tạo/duyệt khóa học).
 package middleware
 
 import (
@@ -16,26 +16,26 @@ type ctxKey string
 
 const claimsCtxKey ctxKey = "auth_claims"
 
-// TokenVerifier is satisfied by *security.JWTIssuer.
+// TokenVerifier được hiện thực bởi *security.JWTIssuer.
 type TokenVerifier interface {
 	Verify(tokenString string) (*security.Claims, error)
 }
 
-// RequireAuth verifies the Bearer token and stores the parsed claims on the
-// request context for downstream handlers/middleware to read.
+// RequireAuth xác thực Bearer token và lưu claims đã parse vào request
+// context để handler/middleware phía sau đọc.
 func RequireAuth(verifier TokenVerifier) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			header := r.Header.Get("Authorization")
 			token, ok := strings.CutPrefix(header, "Bearer ")
 			if !ok || token == "" {
-				http.Error(w, `{"error":"missing bearer token"}`, http.StatusUnauthorized)
+				http.Error(w, `{"error":"thiếu bearer token"}`, http.StatusUnauthorized)
 				return
 			}
 
 			claims, err := verifier.Verify(token)
 			if err != nil {
-				http.Error(w, `{"error":"invalid or expired token"}`, http.StatusUnauthorized)
+				http.Error(w, `{"error":"token không hợp lệ hoặc đã hết hạn"}`, http.StatusUnauthorized)
 				return
 			}
 
@@ -45,14 +45,14 @@ func RequireAuth(verifier TokenVerifier) func(http.Handler) http.Handler {
 	}
 }
 
-// RequireRole must run after RequireAuth. It implements the RBAC checks for
-// US1.3-style role restrictions (e.g. only teacher/admin can create courses).
+// RequireRole phải chạy sau RequireAuth. Đây là nơi hiện thực kiểm tra RBAC
+// kiểu US1.3 (vd chỉ teacher/admin mới được tạo khóa học).
 func RequireRole(allowed ...user.Role) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			claims, ok := ClaimsFromContext(r.Context())
 			if !ok {
-				http.Error(w, `{"error":"missing auth context"}`, http.StatusUnauthorized)
+				http.Error(w, `{"error":"thiếu thông tin xác thực"}`, http.StatusUnauthorized)
 				return
 			}
 			for _, role := range allowed {
@@ -61,7 +61,7 @@ func RequireRole(allowed ...user.Role) func(http.Handler) http.Handler {
 					return
 				}
 			}
-			http.Error(w, `{"error":"forbidden: insufficient role"}`, http.StatusForbidden)
+			http.Error(w, `{"error":"forbidden: không đủ quyền"}`, http.StatusForbidden)
 		})
 	}
 }

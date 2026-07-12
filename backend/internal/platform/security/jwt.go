@@ -9,17 +9,17 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var ErrInvalidToken = errors.New("security: invalid or expired token")
+var ErrInvalidToken = errors.New("security: token không hợp lệ hoặc đã hết hạn")
 
-// Claims carried inside the JWT, exposed to the handler/middleware layer.
+// Claims chứa trong JWT, được expose ra tầng handler/middleware.
 type Claims struct {
 	UserID uint      `json:"uid"`
 	Role   user.Role `json:"role"`
 	jwt.RegisteredClaims
 }
 
-// JWTIssuer implements service/auth.TokenIssuer and is also used by the
-// HTTP auth middleware to verify incoming tokens.
+// JWTIssuer hiện thực service/auth.TokenIssuer, đồng thời được HTTP auth
+// middleware dùng để verify token của request.
 type JWTIssuer struct {
 	secret []byte
 	ttl    time.Duration

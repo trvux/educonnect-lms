@@ -2,9 +2,8 @@ package logger
 
 import "go.uber.org/zap"
 
-// New builds the process-wide structured logger. Dev builds get readable
-// console output; set APP_ENV=production for JSON logs suited to log
-// aggregators.
+// New dựng logger structured dùng chung toàn process. Bản dev in ra console
+// dễ đọc; set APP_ENV=production để log dạng JSON phù hợp cho log aggregator.
 func New(env string) (*zap.Logger, error) {
 	if env == "production" {
 		return zap.NewProduction()

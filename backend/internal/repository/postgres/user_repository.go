@@ -30,7 +30,7 @@ func (r *UserRepository) Create(ctx context.Context, u *user.User) error {
 		u.Email(), u.PasswordHash(), u.FullName(), u.Role(), u.Active(), u.CreatedAt(), u.UpdatedAt(),
 	).Scan(&id)
 	if err != nil {
-		return fmt.Errorf("postgres: create user: %w", err)
+		return fmt.Errorf("postgres: tạo user lỗi: %w", err)
 	}
 	u.SetID(id)
 	return nil
@@ -56,7 +56,7 @@ func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 		WHERE id = $7`
 	tag, err := r.pool.Exec(ctx, q, u.Email(), u.PasswordHash(), u.FullName(), u.Role(), u.Active(), u.UpdatedAt(), u.ID())
 	if err != nil {
-		return fmt.Errorf("postgres: update user: %w", err)
+		return fmt.Errorf("postgres: cập nhật user lỗi: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return user.ErrNotFound
@@ -77,7 +77,7 @@ func (r *UserRepository) scanOne(row pgx.Row) (*user.User, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, user.ErrNotFound
 		}
-		return nil, fmt.Errorf("postgres: scan user: %w", err)
+		return nil, fmt.Errorf("postgres: đọc dữ liệu user lỗi: %w", err)
 	}
 	return user.Rehydrate(id, email, hash, fullName, role, active, createdAt, updatedAt), nil
 }

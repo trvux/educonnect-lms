@@ -1,6 +1,6 @@
-// Package handler adapts HTTP (chi) requests to the service layer and maps
-// domain/service errors to HTTP status codes. It knows nothing about SQL or
-// bcrypt — only about services.
+// Package handler chuyển đổi request HTTP (chi) sang lời gọi tầng service và
+// map lỗi domain/service sang mã HTTP status. Tầng này không biết gì về
+// SQL hay bcrypt — chỉ làm việc với service.
 package handler
 
 import (

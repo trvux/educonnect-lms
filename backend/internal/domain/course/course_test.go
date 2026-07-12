@@ -26,7 +26,7 @@ func TestCourse_ApprovalFlow(t *testing.T) {
 	c, err := course.NewCourse("Nhap mon Golang", "desc", 1)
 	require.NoError(t, err)
 
-	// Cannot approve directly from Draft.
+	// Không thể duyệt trực tiếp từ trạng thái Draft.
 	err = c.Approve()
 	assert.ErrorIs(t, err, course.ErrNotPending)
 	assert.False(t, c.IsSearchable())

@@ -78,7 +78,7 @@ func TestService_SubmitAndApprove(t *testing.T) {
 	c, err := s.Create(ctx, courseservice.CreateInput{Title: "Golang", TeacherID: 1})
 	require.NoError(t, err)
 
-	// A different teacher cannot submit someone else's course.
+	// Giáo viên khác không được submit khóa học không phải của mình.
 	_, err = s.SubmitForReview(ctx, c.ID(), 999)
 	assert.ErrorIs(t, err, course.ErrNotFound)
 

@@ -15,8 +15,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// CourseService is the subset of *courseservice.Service the handler depends
-// on — kept as an interface so tests can inject a fake.
+// CourseService là tập con method của *courseservice.Service mà handler
+// cần — để dạng interface để test có thể inject fake.
 type CourseService interface {
 	Create(ctx context.Context, in courseservice.CreateInput) (*course.Course, error)
 	Search(ctx context.Context, keyword string) ([]*course.Course, error)
@@ -53,17 +53,17 @@ func toCourseResponse(c *course.Course) courseResponse {
 	}
 }
 
-// Create handles POST /api/courses (US2.1, teacher-only — see router.go).
+// Create xử lý POST /api/courses (US2.1, chỉ teacher — xem router.go).
 func (h *CourseHandler) Create(w http.ResponseWriter, r *http.Request) {
 	claims, ok := middleware.ClaimsFromContext(r.Context())
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing auth context")
+		writeError(w, http.StatusUnauthorized, "thiếu thông tin xác thực")
 		return
 	}
 
 	var req createCourseRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		writeError(w, http.StatusBadRequest, "body JSON không hợp lệ")
 		return
 	}
 
@@ -77,13 +77,13 @@ func (h *CourseHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, toCourseResponse(c))
 }
 
-// Search handles GET /api/courses?search=... (US3.1, public).
+// Search xử lý GET /api/courses?search=... (US3.1, public).
 func (h *CourseHandler) Search(w http.ResponseWriter, r *http.Request) {
 	keyword := r.URL.Query().Get("search")
 	results, err := h.service.Search(r.Context(), keyword)
 	if err != nil {
-		h.log.Error("course handler: search failed", zap.Error(err))
-		writeError(w, http.StatusInternalServerError, "internal server error")
+		h.log.Error("course handler: tìm kiếm thất bại", zap.Error(err))
+		writeError(w, http.StatusInternalServerError, "lỗi hệ thống, vui lòng thử lại sau")
 		return
 	}
 	out := make([]courseResponse, 0, len(results))
@@ -93,16 +93,16 @@ func (h *CourseHandler) Search(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-// SubmitForReview handles POST /api/courses/{id}/submit (teacher-only).
+// SubmitForReview xử lý POST /api/courses/{id}/submit (chỉ teacher).
 func (h *CourseHandler) SubmitForReview(w http.ResponseWriter, r *http.Request) {
 	claims, ok := middleware.ClaimsFromContext(r.Context())
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing auth context")
+		writeError(w, http.StatusUnauthorized, "thiếu thông tin xác thực")
 		return
 	}
 	id, err := parseIDParam(r)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid course id")
+		writeError(w, http.StatusBadRequest, "course id không hợp lệ")
 		return
 	}
 	c, err := h.service.SubmitForReview(r.Context(), id, claims.UserID)
@@ -113,11 +113,11 @@ func (h *CourseHandler) SubmitForReview(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, toCourseResponse(c))
 }
 
-// Approve handles POST /api/admin/courses/{id}/approve (US2.3, admin-only).
+// Approve xử lý POST /api/admin/courses/{id}/approve (US2.3, chỉ admin).
 func (h *CourseHandler) Approve(w http.ResponseWriter, r *http.Request) {
 	id, err := parseIDParam(r)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid course id")
+		writeError(w, http.StatusBadRequest, "course id không hợp lệ")
 		return
 	}
 	c, err := h.service.Approve(r.Context(), id)
@@ -145,7 +145,7 @@ func (h *CourseHandler) handleCourseError(w http.ResponseWriter, err error) {
 	case errors.Is(err, course.ErrEmptyTitle), errors.Is(err, course.ErrInvalidTeacherID):
 		writeError(w, http.StatusBadRequest, err.Error())
 	default:
-		h.log.Error("course handler: unexpected error", zap.Error(err))
-		writeError(w, http.StatusInternalServerError, "internal server error")
+		h.log.Error("course handler: lỗi không xác định", zap.Error(err))
+		writeError(w, http.StatusInternalServerError, "lỗi hệ thống, vui lòng thử lại sau")
 	}
 }

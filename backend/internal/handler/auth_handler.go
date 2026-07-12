@@ -12,8 +12,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// AuthService is the subset of *auth.Service the handler depends on — kept
-// as an interface so tests can inject a fake instead of hitting Postgres.
+// AuthService là tập con method của *auth.Service mà handler cần — để dạng
+// interface để test có thể inject fake thay vì gọi Postgres thật.
 type AuthService interface {
 	Register(ctx context.Context, in auth.RegisterInput) (*user.User, error)
 	Login(ctx context.Context, in auth.LoginInput) (string, error)
@@ -42,11 +42,11 @@ type userResponse struct {
 	Role     string `json:"role"`
 }
 
-// Register handles POST /api/auth/register (US1.1).
+// Register xử lý POST /api/auth/register (US1.1).
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		writeError(w, http.StatusBadRequest, "body JSON không hợp lệ")
 		return
 	}
 
@@ -75,11 +75,11 @@ type loginResponse struct {
 	Token string `json:"token"`
 }
 
-// Login handles POST /api/auth/login (US1.2).
+// Login xử lý POST /api/auth/login (US1.2).
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		writeError(w, http.StatusBadRequest, "body JSON không hợp lệ")
 		return
 	}
 
@@ -105,7 +105,7 @@ func (h *AuthHandler) handleAuthError(w http.ResponseWriter, err error) {
 		errors.Is(err, user.ErrEmptyPasswordHash):
 		writeError(w, http.StatusBadRequest, err.Error())
 	default:
-		h.log.Error("auth handler: unexpected error", zap.Error(err))
-		writeError(w, http.StatusInternalServerError, "internal server error")
+		h.log.Error("auth handler: lỗi không xác định", zap.Error(err))
+		writeError(w, http.StatusInternalServerError, "lỗi hệ thống, vui lòng thử lại sau")
 	}
 }

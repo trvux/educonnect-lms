@@ -1,6 +1,6 @@
-// Package postgres implements the domain repository ports (user.Repository,
-// course.Repository) on top of pgx, keeping raw SQL close to the schema
-// instead of hiding it behind an ORM.
+// Package postgres hiện thực các repository port của domain (user.Repository,
+// course.Repository) trên nền pgx, viết SQL thuần bám sát schema thay vì
+// giấu sau một ORM.
 package postgres
 
 import (
@@ -33,7 +33,7 @@ func (r *CourseRepository) Create(ctx context.Context, c *course.Course) error {
 		c.Title(), c.Description(), c.TeacherID(), c.Status(), c.CreatedAt(), c.UpdatedAt(),
 	).Scan(&id)
 	if err != nil {
-		return fmt.Errorf("postgres: create course: %w", err)
+		return fmt.Errorf("postgres: tạo course lỗi: %w", err)
 	}
 	c.SetID(id)
 	return nil
@@ -46,8 +46,8 @@ func (r *CourseRepository) FindByID(ctx context.Context, id uint) (*course.Cours
 	return r.scanOne(r.pool.QueryRow(ctx, q, id))
 }
 
-// Search implements US3.1: only courses that have been Approved (US2.3) are
-// visible to students, and matching is done on the title.
+// Search hiện thực US3.1: chỉ khóa học đã Approved (US2.3) mới hiện ra
+// với học viên, việc tìm kiếm khớp theo title.
 func (r *CourseRepository) Search(ctx context.Context, keyword string) ([]*course.Course, error) {
 	const q = `
 		SELECT id, title, description, teacher_id, status, created_at, updated_at
@@ -56,7 +56,7 @@ func (r *CourseRepository) Search(ctx context.Context, keyword string) ([]*cours
 		ORDER BY created_at DESC`
 	rows, err := r.pool.Query(ctx, q, course.StatusApproved, keyword)
 	if err != nil {
-		return nil, fmt.Errorf("postgres: search courses: %w", err)
+		return nil, fmt.Errorf("postgres: tìm kiếm course lỗi: %w", err)
 	}
 	defer rows.Close()
 	return r.scanMany(rows)
@@ -69,7 +69,7 @@ func (r *CourseRepository) ListByTeacher(ctx context.Context, teacherID uint) ([
 		ORDER BY created_at DESC`
 	rows, err := r.pool.Query(ctx, q, teacherID)
 	if err != nil {
-		return nil, fmt.Errorf("postgres: list courses by teacher: %w", err)
+		return nil, fmt.Errorf("postgres: lấy danh sách course theo giáo viên lỗi: %w", err)
 	}
 	defer rows.Close()
 	return r.scanMany(rows)
@@ -81,7 +81,7 @@ func (r *CourseRepository) Update(ctx context.Context, c *course.Course) error {
 		WHERE id = $5`
 	tag, err := r.pool.Exec(ctx, q, c.Title(), c.Description(), c.Status(), c.UpdatedAt(), c.ID())
 	if err != nil {
-		return fmt.Errorf("postgres: update course: %w", err)
+		return fmt.Errorf("postgres: cập nhật course lỗi: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return course.ErrNotFound
@@ -102,7 +102,7 @@ func (r *CourseRepository) scanOne(row pgx.Row) (*course.Course, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, course.ErrNotFound
 		}
-		return nil, fmt.Errorf("postgres: scan course: %w", err)
+		return nil, fmt.Errorf("postgres: đọc dữ liệu course lỗi: %w", err)
 	}
 	return course.Rehydrate(id, title, description, teacherID, status, createdAt, updatedAt), nil
 }
@@ -118,12 +118,12 @@ func (r *CourseRepository) scanMany(rows pgx.Rows) ([]*course.Course, error) {
 			createdAt, updatedAt time.Time
 		)
 		if err := rows.Scan(&id, &title, &description, &teacherID, &status, &createdAt, &updatedAt); err != nil {
-			return nil, fmt.Errorf("postgres: scan course row: %w", err)
+			return nil, fmt.Errorf("postgres: đọc dòng course lỗi: %w", err)
 		}
 		result = append(result, course.Rehydrate(id, title, description, teacherID, status, createdAt, updatedAt))
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("postgres: iterate course rows: %w", err)
+		return nil, fmt.Errorf("postgres: duyệt danh sách course lỗi: %w", err)
 	}
 	return result, nil
 }

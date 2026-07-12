@@ -14,8 +14,8 @@ type Config struct {
 	JWTSecret   string
 }
 
-// Load reads .env (if present — Docker/CI can rely on real env vars instead)
-// and validates that the required settings are non-empty.
+// Load đọc file .env (nếu có — Docker/CI có thể dùng biến môi trường thật
+// thay vì .env) và validate các config bắt buộc không được rỗng.
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
@@ -27,10 +27,10 @@ func Load() (*Config, error) {
 	}
 
 	if cfg.DatabaseURL == "" {
-		return nil, errors.New("config: DATABASE_URL is required")
+		return nil, errors.New("config: DATABASE_URL là bắt buộc")
 	}
 	if cfg.JWTSecret == "" {
-		return nil, errors.New("config: JWT_SECRET is required")
+		return nil, errors.New("config: JWT_SECRET là bắt buộc")
 	}
 	return cfg, nil
 }

@@ -15,13 +15,13 @@ const (
 )
 
 var (
-	ErrEmptyTitle       = errors.New("course: title is required")
-	ErrInvalidTeacherID = errors.New("course: teacher id is required")
-	ErrNotPending       = errors.New("course: only a pending course can be approved")
-	ErrNotFound         = errors.New("course: not found")
+	ErrEmptyTitle       = errors.New("course: tiêu đề là bắt buộc")
+	ErrInvalidTeacherID = errors.New("course: teacher id là bắt buộc")
+	ErrNotPending       = errors.New("course: chỉ khóa học đang chờ duyệt mới được duyệt")
+	ErrNotFound         = errors.New("course: không tìm thấy")
 )
 
-// Course is the aggregate root for Epic 2 (Quản lý khóa học).
+// Course là aggregate root cho Epic 2 (Quản lý khóa học).
 type Course struct {
 	id          uint
 	title       string
@@ -32,9 +32,9 @@ type Course struct {
 	updatedAt   time.Time
 }
 
-// NewCourse creates a course as Draft (US2.1). It always starts unpublished;
-// a teacher must explicitly SubmitForReview and an admin must Approve (US2.3)
-// before students can find it (US3.1 only searches Approved courses).
+// NewCourse tạo khóa học ở trạng thái Draft (US2.1). Luôn bắt đầu ở dạng
+// chưa công khai; giảng viên phải chủ động SubmitForReview và quản trị viên
+// phải Approve (US2.3) thì học viên mới tìm thấy được (US3.1 chỉ search course Approved).
 func NewCourse(title, description string, teacherID uint) (*Course, error) {
 	if title == "" {
 		return nil, ErrEmptyTitle
@@ -80,7 +80,7 @@ func (c *Course) SubmitForReview() {
 	c.updatedAt = time.Now().UTC()
 }
 
-// Approve is used by US2.3 (Quản trị viên duyệt khóa học).
+// Approve dùng cho US2.3 (Quản trị viên duyệt khóa học).
 func (c *Course) Approve() error {
 	if c.status != StatusPending {
 		return ErrNotPending
@@ -102,8 +102,8 @@ func (c *Course) Status() Status       { return c.status }
 func (c *Course) CreatedAt() time.Time { return c.createdAt }
 func (c *Course) UpdatedAt() time.Time { return c.updatedAt }
 
-// Repository is the port the service layer depends on (US2.1 create,
-// US3.1 search); implemented by internal/repository/postgres.
+// Repository là port mà tầng service phụ thuộc vào (US2.1 tạo,
+// US3.1 tìm kiếm); được implement bởi internal/repository/postgres.
 type Repository interface {
 	Create(ctx context.Context, c *Course) error
 	FindByID(ctx context.Context, id uint) (*Course, error)
