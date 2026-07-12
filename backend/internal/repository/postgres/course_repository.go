@@ -91,10 +91,10 @@ func (r *CourseRepository) Update(ctx context.Context, c *course.Course) error {
 
 func (r *CourseRepository) scanOne(row pgx.Row) (*course.Course, error) {
 	var (
-		id                  uint
-		title, description  string
-		teacherID           uint
-		status              course.Status
+		id                   uint
+		title, description   string
+		teacherID            uint
+		status               course.Status
 		createdAt, updatedAt time.Time
 	)
 	err := row.Scan(&id, &title, &description, &teacherID, &status, &createdAt, &updatedAt)
@@ -111,10 +111,10 @@ func (r *CourseRepository) scanMany(rows pgx.Rows) ([]*course.Course, error) {
 	var result []*course.Course
 	for rows.Next() {
 		var (
-			id                  uint
-			title, description  string
-			teacherID           uint
-			status              course.Status
+			id                   uint
+			title, description   string
+			teacherID            uint
+			status               course.Status
 			createdAt, updatedAt time.Time
 		)
 		if err := rows.Scan(&id, &title, &description, &teacherID, &status, &createdAt, &updatedAt); err != nil {

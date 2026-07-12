@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS materials;
+DROP TABLE IF EXISTS lessons;
+DROP TABLE IF EXISTS chapters;

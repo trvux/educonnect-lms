@@ -6,6 +6,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 )
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
@@ -22,4 +23,14 @@ type errorResponse struct {
 
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, errorResponse{Error: message})
+}
+
+// parseIDString parse 1 URL param dạng chuỗi số thành uint, dùng chung bởi
+// mọi handler cần đọc {id}/{courseId}/{chapterId}/... từ route.
+func parseIDString(s string) (uint, error) {
+	id, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return uint(id), nil
 }

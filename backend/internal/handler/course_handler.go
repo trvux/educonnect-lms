@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
 
 	"educonnect-lms/backend/internal/domain/course"
 	"educonnect-lms/backend/internal/handler/middleware"
@@ -129,11 +128,7 @@ func (h *CourseHandler) Approve(w http.ResponseWriter, r *http.Request) {
 }
 
 func parseIDParam(r *http.Request) (uint, error) {
-	id, err := strconv.ParseUint(chi.URLParam(r, "id"), 10, 64)
-	if err != nil {
-		return 0, err
-	}
-	return uint(id), nil
+	return parseIDString(chi.URLParam(r, "id"))
 }
 
 func (h *CourseHandler) handleCourseError(w http.ResponseWriter, err error) {
