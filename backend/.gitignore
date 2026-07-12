@@ -2,3 +2,5 @@
 bin/
 *.log
 uploads/
+tmp/
+build-errors.log

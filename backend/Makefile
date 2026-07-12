@@ -3,7 +3,9 @@ export
 
 MIGRATE := $(shell go env GOPATH)/bin/migrate
 
-.PHONY: up down migrate-install migrate-up migrate-down migrate-create test run build
+AIR := $(shell go env GOPATH)/bin/air
+
+.PHONY: up down migrate-install migrate-up migrate-down migrate-create test run build dev
 
 up: ## Start Postgres in Docker
 	docker compose up -d
@@ -28,8 +30,11 @@ migrate-create: ## Usage: make migrate-create name=add_assignments_table
 test: ## Run unit + integration tests (needs `make up` + `make migrate-up` first for repository tests)
 	go test ./... -v
 
-run: ## Run the API locally
+run: ## Run the API locally (1 lần, không tự reload)
 	go run ./cmd/api
+
+dev: ## Chạy API với air — tự build lại & restart mỗi khi sửa file .go
+	$(AIR) -c .air.toml
 
 build:
 	go build -o bin/api ./cmd/api
