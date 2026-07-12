@@ -109,5 +109,7 @@ type Repository interface {
 	FindByID(ctx context.Context, id uint) (*Course, error)
 	Search(ctx context.Context, keyword string) ([]*Course, error)
 	ListByTeacher(ctx context.Context, teacherID uint) ([]*Course, error)
+	// ListByStatus dùng cho US2.3 (Admin xem hàng chờ duyệt PendingReview).
+	ListByStatus(ctx context.Context, status Status) ([]*Course, error)
 	Update(ctx context.Context, c *Course) error
 }

@@ -18,7 +18,9 @@ import (
 // cần — để dạng interface để test có thể inject fake.
 type CourseService interface {
 	Create(ctx context.Context, in courseservice.CreateInput) (*course.Course, error)
+	Get(ctx context.Context, id uint) (*course.Course, error)
 	Search(ctx context.Context, keyword string) ([]*course.Course, error)
+	ListPending(ctx context.Context) ([]*course.Course, error)
 	SubmitForReview(ctx context.Context, courseID, teacherID uint) (*course.Course, error)
 	Approve(ctx context.Context, courseID uint) (*course.Course, error)
 }
@@ -82,6 +84,37 @@ func (h *CourseHandler) Search(w http.ResponseWriter, r *http.Request) {
 	results, err := h.service.Search(r.Context(), keyword)
 	if err != nil {
 		h.log.Error("course handler: tìm kiếm thất bại", zap.Error(err))
+		writeError(w, http.StatusInternalServerError, "lỗi hệ thống, vui lòng thử lại sau")
+		return
+	}
+	out := make([]courseResponse, 0, len(results))
+	for _, c := range results {
+		out = append(out, toCourseResponse(c))
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// Get xử lý GET /api/courses/{id} (public — xem chi tiết 1 khóa học).
+func (h *CourseHandler) Get(w http.ResponseWriter, r *http.Request) {
+	id, err := parseIDParam(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "course id không hợp lệ")
+		return
+	}
+	c, err := h.service.Get(r.Context(), id)
+	if err != nil {
+		h.handleCourseError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toCourseResponse(c))
+}
+
+// ListPending xử lý GET /api/admin/courses/pending (US2.3, chỉ admin —
+// hàng chờ duyệt).
+func (h *CourseHandler) ListPending(w http.ResponseWriter, r *http.Request) {
+	results, err := h.service.ListPending(r.Context())
+	if err != nil {
+		h.log.Error("course handler: lấy hàng chờ duyệt thất bại", zap.Error(err))
 		writeError(w, http.StatusInternalServerError, "lỗi hệ thống, vui lòng thử lại sau")
 		return
 	}

@@ -54,6 +54,16 @@ func (r *fakeCourseRepo) ListByTeacher(_ context.Context, teacherID uint) ([]*co
 	return out, nil
 }
 
+func (r *fakeCourseRepo) ListByStatus(_ context.Context, status course.Status) ([]*course.Course, error) {
+	var out []*course.Course
+	for _, c := range r.byID {
+		if c.Status() == status {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
 func (r *fakeCourseRepo) Update(_ context.Context, c *course.Course) error {
 	r.byID[c.ID()] = c
 	return nil

@@ -76,6 +76,7 @@ func main() {
 		EnrollmentHandler: enrollmentHandler,
 		MaterialHandler:   materialHandler,
 		TokenVerifier:     tokens,
+		UploadsDir:        "uploads",
 	})
 
 	srv := &http.Server{

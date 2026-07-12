@@ -66,6 +66,9 @@ func (r *fakeCourseRepo) Search(_ context.Context, _ string) ([]*course.Course, 
 func (r *fakeCourseRepo) ListByTeacher(_ context.Context, _ uint) ([]*course.Course, error) {
 	return nil, nil
 }
+func (r *fakeCourseRepo) ListByStatus(_ context.Context, _ course.Status) ([]*course.Course, error) {
+	return nil, nil
+}
 func (r *fakeCourseRepo) Update(_ context.Context, c *course.Course) error {
 	r.byID[c.ID()] = c
 	return nil

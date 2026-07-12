@@ -39,6 +39,17 @@ func (s *Service) Search(ctx context.Context, keyword string) ([]*course.Course,
 	return s.courses.Search(ctx, keyword)
 }
 
+// Get trả về 1 khóa học theo ID (dùng cho trang chi tiết khóa học).
+func (s *Service) Get(ctx context.Context, id uint) (*course.Course, error) {
+	return s.courses.FindByID(ctx, id)
+}
+
+// ListPending hiện thực hàng chờ duyệt của US2.3 (Admin xem danh sách
+// khóa học đang PendingReview trước khi Approve).
+func (s *Service) ListPending(ctx context.Context) ([]*course.Course, error) {
+	return s.courses.ListByStatus(ctx, course.StatusPending)
+}
+
 func (s *Service) ListByTeacher(ctx context.Context, teacherID uint) ([]*course.Course, error) {
 	return s.courses.ListByTeacher(ctx, teacherID)
 }

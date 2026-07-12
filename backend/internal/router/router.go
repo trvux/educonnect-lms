@@ -20,6 +20,9 @@ type Deps struct {
 	EnrollmentHandler *handler.EnrollmentHandler
 	MaterialHandler   *handler.MaterialHandler
 	TokenVerifier     middleware.TokenVerifier
+	// UploadsDir là thư mục lưu file vật lý (US4.1), phục vụ tĩnh qua
+	// /uploads/* để frontend tải xuống (US4.2).
+	UploadsDir string
 }
 
 func New(deps Deps) http.Handler {
@@ -45,6 +48,14 @@ func New(deps Deps) http.Handler {
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
+	// Phục vụ file tĩnh đã upload (US4.1) để frontend tải xuống (US4.2).
+	uploadsDir := deps.UploadsDir
+	if uploadsDir == "" {
+		uploadsDir = "uploads"
+	}
+	fileServer := http.StripPrefix("/uploads/", http.FileServer(http.Dir(uploadsDir)))
+	r.Handle("/uploads/*", fileServer)
+
 	r.Route("/api", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/register", deps.AuthHandler.Register) // US1.1
@@ -52,6 +63,7 @@ func New(deps Deps) http.Handler {
 		})
 
 		r.Get("/courses", deps.CourseHandler.Search)                               // US3.1, public
+		r.Get("/courses/{id}", deps.CourseHandler.Get)                             // xem chi tiết khóa học, public
 		r.Get("/courses/{courseId}/chapters", deps.CurriculumHandler.ListChapters) // US2.2, public
 		r.Get("/chapters/{chapterId}/lessons", deps.CurriculumHandler.ListLessons) // US2.2, public
 		r.Get("/lessons/{id}/materials", deps.MaterialHandler.List)                // US4.2, public
@@ -74,6 +86,7 @@ func New(deps Deps) http.Handler {
 
 			r.Route("/admin", func(r chi.Router) {
 				r.Use(middleware.RequireRole(user.RoleAdmin))
+				r.Get("/courses/pending", deps.CourseHandler.ListPending)   // US2.3, hàng chờ duyệt
 				r.Post("/courses/{id}/approve", deps.CourseHandler.Approve) // US2.3
 			})
 		})

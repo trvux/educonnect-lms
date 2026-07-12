@@ -75,6 +75,19 @@ func (r *CourseRepository) ListByTeacher(ctx context.Context, teacherID uint) ([
 	return r.scanMany(rows)
 }
 
+func (r *CourseRepository) ListByStatus(ctx context.Context, status course.Status) ([]*course.Course, error) {
+	const q = `
+		SELECT id, title, description, teacher_id, status, created_at, updated_at
+		FROM courses WHERE status = $1
+		ORDER BY created_at ASC`
+	rows, err := r.pool.Query(ctx, q, status)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: lấy danh sách course theo status lỗi: %w", err)
+	}
+	defer rows.Close()
+	return r.scanMany(rows)
+}
+
 func (r *CourseRepository) Update(ctx context.Context, c *course.Course) error {
 	const q = `
 		UPDATE courses SET title = $1, description = $2, status = $3, updated_at = $4
