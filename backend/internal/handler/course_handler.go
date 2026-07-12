@@ -9,26 +9,19 @@ import (
 
 	"educonnect-lms/backend/internal/domain/course"
 	"educonnect-lms/backend/internal/handler/middleware"
+	courseservice "educonnect-lms/backend/internal/service/course"
 
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )
 
-// CourseService is the subset of *course.Service the handler depends on.
+// CourseService is the subset of *courseservice.Service the handler depends
+// on — kept as an interface so tests can inject a fake.
 type CourseService interface {
-	Create(ctx context.Context, in courseCreateInput) (*course.Course, error)
+	Create(ctx context.Context, in courseservice.CreateInput) (*course.Course, error)
 	Search(ctx context.Context, keyword string) ([]*course.Course, error)
 	SubmitForReview(ctx context.Context, courseID, teacherID uint) (*course.Course, error)
 	Approve(ctx context.Context, courseID uint) (*course.Course, error)
-}
-
-// courseCreateInput mirrors service/course.CreateInput; declared locally so
-// this package does not need to import the concrete service package just
-// for the interface signature (kept satisfiable by a light adapter in router.go).
-type courseCreateInput = struct {
-	Title       string
-	Description string
-	TeacherID   uint
 }
 
 type CourseHandler struct {
@@ -74,7 +67,7 @@ func (h *CourseHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c, err := h.service.Create(r.Context(), courseCreateInput{
+	c, err := h.service.Create(r.Context(), courseservice.CreateInput{
 		Title: req.Title, Description: req.Description, TeacherID: claims.UserID,
 	})
 	if err != nil {
