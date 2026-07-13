@@ -14,16 +14,17 @@ import (
 )
 
 type Deps struct {
-	AuthHandler       *handler.AuthHandler
-	CourseHandler     *handler.CourseHandler
-	CurriculumHandler *handler.CurriculumHandler
-	EnrollmentHandler *handler.EnrollmentHandler
-	MaterialHandler   *handler.MaterialHandler
-	AssignmentHandler *handler.AssignmentHandler
-	SubmissionHandler *handler.SubmissionHandler
-	GradebookHandler  *handler.GradebookHandler
-	ForumHandler      *handler.ForumHandler
-	TokenVerifier     middleware.TokenVerifier
+	AuthHandler         *handler.AuthHandler
+	CourseHandler       *handler.CourseHandler
+	CurriculumHandler   *handler.CurriculumHandler
+	EnrollmentHandler   *handler.EnrollmentHandler
+	MaterialHandler     *handler.MaterialHandler
+	AssignmentHandler   *handler.AssignmentHandler
+	SubmissionHandler   *handler.SubmissionHandler
+	GradebookHandler    *handler.GradebookHandler
+	ForumHandler        *handler.ForumHandler
+	NotificationHandler *handler.NotificationHandler
+	TokenVerifier       middleware.TokenVerifier
 	// UploadsDir là thư mục lưu file vật lý (US4.1), phục vụ tĩnh qua
 	// /uploads/* để frontend tải xuống (US4.2).
 	UploadsDir string
@@ -87,6 +88,10 @@ func New(deps Deps) http.Handler {
 			r.Post("/courses/{id}/enroll", deps.EnrollmentHandler.Enroll) // US3.2, mọi user đã đăng nhập
 			r.Post("/courses/{id}/forum-posts", deps.ForumHandler.Create) // US6.1, mọi user đã đăng nhập
 
+			r.Get("/notifications", deps.NotificationHandler.ListMine)                 // US6.2
+			r.Get("/notifications/unread-count", deps.NotificationHandler.UnreadCount) // US6.2
+			r.Post("/notifications/{id}/read", deps.NotificationHandler.MarkRead)      // US6.2
+
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireRole(user.RoleStudent))
 				r.Post("/assignments/{id}/submit", deps.SubmissionHandler.Submit) // US5.2
@@ -106,6 +111,8 @@ func New(deps Deps) http.Handler {
 				r.Get("/assignments/{id}/submissions", deps.SubmissionHandler.ListByAssignment) // US5.3
 				r.Post("/submissions/{id}/grade", deps.SubmissionHandler.Grade)                 // US5.3
 				r.Get("/courses/{id}/gradebook", deps.GradebookHandler.ForCourse)               // US5.3
+
+				r.Post("/courses/{id}/notifications", deps.NotificationHandler.SendToCourse) // US6.2
 			})
 
 			r.Route("/admin", func(r chi.Router) {

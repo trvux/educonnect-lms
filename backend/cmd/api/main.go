@@ -21,6 +21,7 @@ import (
 	forumservice "educonnect-lms/backend/internal/service/forum"
 	gradebookservice "educonnect-lms/backend/internal/service/gradebook"
 	materialservice "educonnect-lms/backend/internal/service/material"
+	notificationservice "educonnect-lms/backend/internal/service/notification"
 	submissionservice "educonnect-lms/backend/internal/service/submission"
 
 	"go.uber.org/zap"
@@ -56,6 +57,7 @@ func main() {
 	submissionRepo := postgres.NewSubmissionRepository(pool)
 	gradebookRepo := postgres.NewGradebookRepository(pool)
 	forumRepo := postgres.NewForumRepository(pool)
+	notificationRepo := postgres.NewNotificationRepository(pool)
 	hasher := security.NewBcryptHasher()
 	tokens := security.NewJWTIssuer(cfg.JWTSecret, 24*time.Hour)
 	fileStorage, err := storage.NewLocalFileStorage("uploads")
@@ -73,6 +75,7 @@ func main() {
 	submissionSvc := submissionservice.NewService(submissionRepo, assignmentSvc, lessonRepo, chapterRepo, courseRepo)
 	gradebookSvc := gradebookservice.NewService(gradebookRepo)
 	forumSvc := forumservice.NewService(forumRepo, courseRepo)
+	notificationSvc := notificationservice.NewService(notificationRepo, enrollmentRepo, courseRepo)
 
 	// tầng HTTP
 	authHandler := handler.NewAuthHandler(authSvc, log)
@@ -84,19 +87,21 @@ func main() {
 	submissionHandler := handler.NewSubmissionHandler(submissionSvc, log)
 	gradebookHandler := handler.NewGradebookHandler(gradebookSvc, courseSvc, log)
 	forumHandler := handler.NewForumHandler(forumSvc, log)
+	notificationHandler := handler.NewNotificationHandler(notificationSvc, log)
 
 	r := router.New(router.Deps{
-		AuthHandler:       authHandler,
-		CourseHandler:     courseHandler,
-		CurriculumHandler: curriculumHandler,
-		EnrollmentHandler: enrollmentHandler,
-		MaterialHandler:   materialHandler,
-		AssignmentHandler: assignmentHandler,
-		SubmissionHandler: submissionHandler,
-		GradebookHandler:  gradebookHandler,
-		ForumHandler:      forumHandler,
-		TokenVerifier:     tokens,
-		UploadsDir:        "uploads",
+		AuthHandler:         authHandler,
+		CourseHandler:       courseHandler,
+		CurriculumHandler:   curriculumHandler,
+		EnrollmentHandler:   enrollmentHandler,
+		MaterialHandler:     materialHandler,
+		AssignmentHandler:   assignmentHandler,
+		SubmissionHandler:   submissionHandler,
+		GradebookHandler:    gradebookHandler,
+		ForumHandler:        forumHandler,
+		NotificationHandler: notificationHandler,
+		TokenVerifier:       tokens,
+		UploadsDir:          "uploads",
 	})
 
 	srv := &http.Server{
