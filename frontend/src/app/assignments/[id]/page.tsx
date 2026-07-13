@@ -117,7 +117,7 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
                     Câu {qIndex + 1}: {q.content}
                   </Label>
                   <RadioGroup
-                    value={answers[qIndex] !== undefined ? String(answers[qIndex]) : undefined}
+                    value={String(answers[qIndex] ?? -1)}
                     onValueChange={(v) =>
                       setAnswers((a) => ({ ...a, [qIndex]: Number(v) }))
                     }
