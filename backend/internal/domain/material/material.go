@@ -15,7 +15,7 @@ var (
 	ErrEmptyFileName       = errors.New("material: tên file là bắt buộc")
 	ErrEmptyFilePath       = errors.New("material: đường dẫn lưu trữ là bắt buộc")
 	ErrNotFound            = errors.New("material: không tìm thấy")
-	ErrUnsupportedFileType = errors.New("material: định dạng file không được hỗ trợ (chỉ nhận PDF/Word/Excel/PowerPoint/video)")
+	ErrUnsupportedFileType = errors.New("material: định dạng file không được hỗ trợ (chỉ nhận PDF/Word/Excel/PowerPoint/video/nén)")
 )
 
 // FileType là nhóm định dạng tài liệu (US4.4), phân loại theo phần mở rộng
@@ -27,11 +27,12 @@ var (
 type FileType string
 
 const (
-	FileTypePDF   FileType = "pdf"
-	FileTypeDoc   FileType = "doc"
-	FileTypeExcel FileType = "excel"
-	FileTypePPT   FileType = "ppt"
-	FileTypeVideo FileType = "video"
+	FileTypePDF     FileType = "pdf"
+	FileTypeDoc     FileType = "doc"
+	FileTypeExcel   FileType = "excel"
+	FileTypePPT     FileType = "ppt"
+	FileTypeVideo   FileType = "video"
+	FileTypeArchive FileType = "archive"
 )
 
 var extensionToFileType = map[string]FileType{
@@ -45,6 +46,9 @@ var extensionToFileType = map[string]FileType{
 	".mp4":  FileTypeVideo,
 	".webm": FileTypeVideo,
 	".mov":  FileTypeVideo,
+	".zip":  FileTypeArchive,
+	".rar":  FileTypeArchive,
+	".7z":   FileTypeArchive,
 }
 
 // classifyFileType xác định FileType từ tên file; trả ErrUnsupportedFileType

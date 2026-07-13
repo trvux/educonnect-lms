@@ -40,6 +40,9 @@ func TestNewMaterial_FileTypeWhitelist(t *testing.T) {
 		{"baigiang.mp4", material.FileTypeVideo},
 		{"baigiang.webm", material.FileTypeVideo},
 		{"baigiang.mov", material.FileTypeVideo},
+		{"mon-hoc.zip", material.FileTypeArchive},
+		{"mon-hoc.rar", material.FileTypeArchive},
+		{"mon-hoc.7z", material.FileTypeArchive},
 	}
 	for _, tt := range tests {
 		t.Run(tt.fileName, func(t *testing.T) {
@@ -49,7 +52,7 @@ func TestNewMaterial_FileTypeWhitelist(t *testing.T) {
 		})
 	}
 
-	for _, bad := range []string{"virus.exe", "script.sh", "noext", "archive.zip"} {
+	for _, bad := range []string{"virus.exe", "script.sh", "noext"} {
 		t.Run(bad, func(t *testing.T) {
 			_, err := material.NewMaterial(1, bad, "path/"+bad)
 			assert.ErrorIs(t, err, material.ErrUnsupportedFileType)

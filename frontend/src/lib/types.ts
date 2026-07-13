@@ -22,7 +22,7 @@ export type Lesson = {
   position: number;
 };
 
-export type MaterialFileType = "pdf" | "doc" | "excel" | "ppt" | "video";
+export type MaterialFileType = "pdf" | "doc" | "excel" | "ppt" | "video" | "archive";
 
 export type Material = {
   id: number;

@@ -37,7 +37,7 @@ import {
 // accept chỉ là gợi ý UX (lọc bớt lựa chọn trong hộp thoại chọn file);
 // validation thật vẫn nằm ở backend.
 const ACCEPTED_FILE_EXTENSIONS =
-  ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.mp4,.webm,.mov";
+  ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.mp4,.webm,.mov,.zip,.rar,.7z";
 
 const fileTypeLabel: Record<MaterialFileType, string> = {
   pdf: "PDF",
@@ -45,6 +45,7 @@ const fileTypeLabel: Record<MaterialFileType, string> = {
   excel: "Excel",
   ppt: "PowerPoint",
   video: "Video",
+  archive: "Nén",
 };
 
 // US2.2 (chương/bài học) + US4.1/US4.2 (tài liệu). Mobile-first: mỗi chương
