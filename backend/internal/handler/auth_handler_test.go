@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -30,6 +31,26 @@ func (f *fakeAuthService) Login(ctx context.Context, in auth.LoginInput) (string
 	return f.loginFn(ctx, in)
 }
 
+func (f *fakeAuthService) GetProfile(_ context.Context, _ uint) (*user.User, error) {
+	return nil, user.ErrNotFound
+}
+
+func (f *fakeAuthService) UpdateProfile(_ context.Context, _ uint, _, _, _ string) (*user.User, error) {
+	return nil, user.ErrNotFound
+}
+
+func (f *fakeAuthService) ChangePassword(_ context.Context, _ uint, _, _ string) error {
+	return auth.ErrInvalidCredentials
+}
+
+func (f *fakeAuthService) UploadAvatar(_ context.Context, _ uint, _ string, _ io.Reader) (*user.User, error) {
+	return nil, user.ErrNotFound
+}
+
+func (f *fakeAuthService) ForgotUsername(_ context.Context, _ string) (string, error) {
+	return "", user.ErrNotFound
+}
+
 func TestAuthHandler_Register_Success(t *testing.T) {
 	svc := &fakeAuthService{
 		registerFn: func(_ context.Context, in auth.RegisterInput) (*user.User, error) {
@@ -39,7 +60,7 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 			return u, nil
 		},
 	}
-	h := handler.NewAuthHandler(svc, zap.NewNop())
+	h := handler.NewAuthHandler(svc, zap.NewNop(), false)
 
 	body, _ := json.Marshal(map[string]string{
 		"email": "huy@vlu.edu.vn", "password": "secret123", "full_name": "Huy", "role": "student",
@@ -53,13 +74,63 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "huy@vlu.edu.vn")
 }
 
+func TestAuthHandler_Register_ForcesStudent_WhenRoleOverrideDisabled(t *testing.T) {
+	var gotRole user.Role
+	svc := &fakeAuthService{
+		registerFn: func(_ context.Context, in auth.RegisterInput) (*user.User, error) {
+			gotRole = in.Role
+			u, err := user.NewUser(in.Email, in.FullName, in.Role)
+			require.NoError(t, err)
+			u.SetID(1)
+			return u, nil
+		},
+	}
+	h := handler.NewAuthHandler(svc, zap.NewNop(), false) // ALLOW_ROLE_ON_REGISTER=false (US1.7)
+
+	body, _ := json.Marshal(map[string]string{
+		"email": "huy@vlu.edu.vn", "password": "secret123", "full_name": "Huy", "role": "teacher",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	h.Register(rec, req)
+
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	assert.Equal(t, user.RoleStudent, gotRole, "role client gửi lên phải bị bỏ qua khi flag tắt")
+}
+
+func TestAuthHandler_Register_HonorsRole_WhenOverrideEnabled(t *testing.T) {
+	var gotRole user.Role
+	svc := &fakeAuthService{
+		registerFn: func(_ context.Context, in auth.RegisterInput) (*user.User, error) {
+			gotRole = in.Role
+			u, err := user.NewUser(in.Email, in.FullName, in.Role)
+			require.NoError(t, err)
+			u.SetID(1)
+			return u, nil
+		},
+	}
+	h := handler.NewAuthHandler(svc, zap.NewNop(), true) // dev/seed only
+
+	body, _ := json.Marshal(map[string]string{
+		"email": "gv@vlu.edu.vn", "password": "secret123", "full_name": "GV", "role": "teacher",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	h.Register(rec, req)
+
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	assert.Equal(t, user.RoleTeacher, gotRole)
+}
+
 func TestAuthHandler_Register_EmailTaken(t *testing.T) {
 	svc := &fakeAuthService{
 		registerFn: func(_ context.Context, _ auth.RegisterInput) (*user.User, error) {
 			return nil, auth.ErrEmailTaken
 		},
 	}
-	h := handler.NewAuthHandler(svc, zap.NewNop())
+	h := handler.NewAuthHandler(svc, zap.NewNop(), false)
 
 	body, _ := json.Marshal(map[string]string{
 		"email": "huy@vlu.edu.vn", "password": "secret123", "full_name": "Huy", "role": "student",
@@ -81,7 +152,7 @@ func TestAuthHandler_Login(t *testing.T) {
 			return "signed-jwt-token", nil
 		},
 	}
-	h := handler.NewAuthHandler(svc, zap.NewNop())
+	h := handler.NewAuthHandler(svc, zap.NewNop(), false)
 
 	t.Run("valid credentials", func(t *testing.T) {
 		body, _ := json.Marshal(map[string]string{"email": "huy@vlu.edu.vn", "password": "secret123"})

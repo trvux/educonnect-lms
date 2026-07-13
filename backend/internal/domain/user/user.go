@@ -31,9 +31,13 @@ var (
 	ErrEmptyPasswordHash = errors.New("user: password hash là bắt buộc")
 	ErrInactive          = errors.New("user: tài khoản đã bị khoá")
 	ErrNotFound          = errors.New("user: không tìm thấy")
+	ErrInvalidPhone      = errors.New("user: số điện thoại không hợp lệ")
 )
 
 var emailPattern = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
+
+// phonePattern chấp nhận SĐT Việt Nam dạng 0xxxxxxxxx hoặc +84xxxxxxxxx.
+var phonePattern = regexp.MustCompile(`^(0\d{9}|\+84\d{9})$`)
 
 // User là aggregate root cho quản lý tài khoản & phân quyền (Epic 1).
 // Các field để private: mọi thay đổi trạng thái phải đi qua behavior method
@@ -45,6 +49,9 @@ type User struct {
 	fullName     string
 	role         Role
 	active       bool
+	phone        string
+	studentCode  string // MSSV (học viên) hoặc mã giảng viên
+	avatarPath   string
 	createdAt    time.Time
 	updatedAt    time.Time
 }
@@ -75,7 +82,7 @@ func NewUser(email, fullName string, role Role) (*User, error) {
 // Rehydrate dựng lại 1 User từ dữ liệu đã lưu trong DB. Hàm này tin tưởng
 // tầng lưu trữ (dữ liệu đã hợp lệ từ lúc ghi xuống), chỉ nên gọi từ
 // các repository implementation.
-func Rehydrate(id uint, email, passwordHash, fullName string, role Role, active bool, createdAt, updatedAt time.Time) *User {
+func Rehydrate(id uint, email, passwordHash, fullName string, role Role, active bool, phone, studentCode, avatarPath string, createdAt, updatedAt time.Time) *User {
 	return &User{
 		id:           id,
 		email:        email,
@@ -83,6 +90,9 @@ func Rehydrate(id uint, email, passwordHash, fullName string, role Role, active 
 		fullName:     fullName,
 		role:         role,
 		active:       active,
+		phone:        phone,
+		studentCode:  studentCode,
+		avatarPath:   avatarPath,
 		createdAt:    createdAt,
 		updatedAt:    updatedAt,
 	}
@@ -93,6 +103,37 @@ func (u *User) SetPasswordHash(hash string) error {
 		return ErrEmptyPasswordHash
 	}
 	u.passwordHash = hash
+	u.updatedAt = time.Now().UTC()
+	return nil
+}
+
+// UpdateProfile hiện thực US1.4 (xem/cập nhật hồ sơ cá nhân). SĐT là tuỳ
+// chọn (rỗng hợp lệ), nhưng nếu điền thì phải đúng định dạng VN.
+func (u *User) UpdateProfile(fullName, phone, studentCode string) error {
+	if fullName == "" {
+		return ErrEmptyFullName
+	}
+	if phone != "" && !phonePattern.MatchString(phone) {
+		return ErrInvalidPhone
+	}
+	u.fullName = fullName
+	u.phone = phone
+	u.studentCode = studentCode
+	u.updatedAt = time.Now().UTC()
+	return nil
+}
+
+func (u *User) SetAvatarPath(path string) {
+	u.avatarPath = path
+	u.updatedAt = time.Now().UTC()
+}
+
+// ChangeRole dùng cho US1.7 (Admin duyệt yêu cầu nâng cấp thành Giảng viên).
+func (u *User) ChangeRole(role Role) error {
+	if !role.Valid() {
+		return ErrInvalidRole
+	}
+	u.role = role
 	u.updatedAt = time.Now().UTC()
 	return nil
 }
@@ -124,6 +165,9 @@ func (u *User) PasswordHash() string { return u.passwordHash }
 func (u *User) FullName() string     { return u.fullName }
 func (u *User) Role() Role           { return u.role }
 func (u *User) Active() bool         { return u.active }
+func (u *User) Phone() string        { return u.phone }
+func (u *User) StudentCode() string  { return u.studentCode }
+func (u *User) AvatarPath() string   { return u.avatarPath }
 func (u *User) CreatedAt() time.Time { return u.createdAt }
 func (u *User) UpdatedAt() time.Time { return u.updatedAt }
 
@@ -134,5 +178,7 @@ type Repository interface {
 	Create(ctx context.Context, u *User) error
 	FindByEmail(ctx context.Context, email string) (*User, error)
 	FindByID(ctx context.Context, id uint) (*User, error)
+	// FindByPhone dùng cho US1.8 (quên email đăng nhập, tra cứu qua SĐT).
+	FindByPhone(ctx context.Context, phone string) (*User, error)
 	Update(ctx context.Context, u *User) error
 }

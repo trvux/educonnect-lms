@@ -86,6 +86,9 @@ func (r *fakeUserRepo) FindByID(_ context.Context, id uint) (*user.User, error) 
 	}
 	return nil, user.ErrNotFound
 }
+func (r *fakeUserRepo) FindByPhone(_ context.Context, _ string) (*user.User, error) {
+	return nil, user.ErrNotFound
+}
 func (r *fakeUserRepo) Update(_ context.Context, u *user.User) error { return nil }
 
 func setup(t *testing.T) (*enrollmentservice.Service, *course.Course, *user.User) {

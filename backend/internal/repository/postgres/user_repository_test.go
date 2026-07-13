@@ -39,6 +39,31 @@ func TestUserRepository_FindByEmail_NotFound(t *testing.T) {
 	assert.ErrorIs(t, err, user.ErrNotFound)
 }
 
+func TestUserRepository_UpdateProfileAndFindByPhone(t *testing.T) {
+	pool := openTestPool(t)
+	repo := postgres.NewUserRepository(pool)
+	ctx := context.Background()
+
+	u, err := user.NewUser("huy2@vlu.edu.vn", "Huy", user.RoleStudent)
+	require.NoError(t, err)
+	require.NoError(t, u.SetPasswordHash("hash"))
+	require.NoError(t, repo.Create(ctx, u))
+
+	require.NoError(t, u.UpdateProfile("Huynh Bao Huy", "0987654321", "2074802010001"))
+	u.SetAvatarPath("avatars/1/photo.jpg")
+	require.NoError(t, repo.Update(ctx, u))
+
+	found, err := repo.FindByPhone(ctx, "0987654321")
+	require.NoError(t, err)
+	assert.Equal(t, u.ID(), found.ID())
+	assert.Equal(t, "Huynh Bao Huy", found.FullName())
+	assert.Equal(t, "2074802010001", found.StudentCode())
+	assert.Equal(t, "avatars/1/photo.jpg", found.AvatarPath())
+
+	_, err = repo.FindByPhone(ctx, "0900000000")
+	assert.ErrorIs(t, err, user.ErrNotFound)
+}
+
 func TestUserRepository_Update(t *testing.T) {
 	pool := openTestPool(t)
 	repo := postgres.NewUserRepository(pool)

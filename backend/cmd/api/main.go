@@ -8,6 +8,7 @@ import (
 	"educonnect-lms/backend/internal/handler"
 	"educonnect-lms/backend/internal/platform/config"
 	"educonnect-lms/backend/internal/platform/db"
+	"educonnect-lms/backend/internal/platform/email"
 	"educonnect-lms/backend/internal/platform/logger"
 	"educonnect-lms/backend/internal/platform/security"
 	"educonnect-lms/backend/internal/platform/storage"
@@ -24,6 +25,7 @@ import (
 	notificationservice "educonnect-lms/backend/internal/service/notification"
 	progressservice "educonnect-lms/backend/internal/service/progress"
 	reportservice "educonnect-lms/backend/internal/service/report"
+	roleupgradeservice "educonnect-lms/backend/internal/service/roleupgrade"
 	submissionservice "educonnect-lms/backend/internal/service/submission"
 
 	"go.uber.org/zap"
@@ -62,15 +64,19 @@ func main() {
 	notificationRepo := postgres.NewNotificationRepository(pool)
 	progressRepo := postgres.NewProgressRepository(pool)
 	reportRepo := postgres.NewReportRepository(pool)
+	passwordResetRepo := postgres.NewPasswordResetRepository(pool)
+	roleUpgradeRepo := postgres.NewRoleUpgradeRepository(pool)
 	hasher := security.NewBcryptHasher()
 	tokens := security.NewJWTIssuer(cfg.JWTSecret, 24*time.Hour)
 	fileStorage, err := storage.NewLocalFileStorage("uploads")
 	if err != nil {
 		log.Fatal("khởi tạo file storage thất bại", zap.Error(err))
 	}
+	emailSender := email.NewSMTPSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPFrom)
 
 	// tầng service (application)
-	authSvc := authservice.NewService(userRepo, hasher, tokens)
+	authSvc := authservice.NewService(userRepo, hasher, tokens, fileStorage, passwordResetRepo, emailSender)
+	roleUpgradeSvc := roleupgradeservice.NewService(roleUpgradeRepo, userRepo)
 	courseSvc := courseservice.NewService(courseRepo)
 	curriculumSvc := curriculumservice.NewService(chapterRepo, lessonRepo)
 	enrollmentSvc := enrollmentservice.NewService(enrollmentRepo, courseRepo, userRepo)
@@ -84,7 +90,7 @@ func main() {
 	reportSvc := reportservice.NewService(reportRepo)
 
 	// tầng HTTP
-	authHandler := handler.NewAuthHandler(authSvc, log)
+	authHandler := handler.NewAuthHandler(authSvc, log, cfg.AllowRoleOnRegister)
 	courseHandler := handler.NewCourseHandler(courseSvc, log)
 	curriculumHandler := handler.NewCurriculumHandler(curriculumSvc, log)
 	enrollmentHandler := handler.NewEnrollmentHandler(enrollmentSvc, log)
@@ -96,22 +102,26 @@ func main() {
 	notificationHandler := handler.NewNotificationHandler(notificationSvc, log)
 	progressHandler := handler.NewProgressHandler(progressSvc, log)
 	reportHandler := handler.NewReportHandler(reportSvc, log)
+	passwordResetHandler := handler.NewPasswordResetHandler(authSvc, log)
+	roleUpgradeHandler := handler.NewRoleUpgradeHandler(roleUpgradeSvc, log)
 
 	r := router.New(router.Deps{
-		AuthHandler:         authHandler,
-		CourseHandler:       courseHandler,
-		CurriculumHandler:   curriculumHandler,
-		EnrollmentHandler:   enrollmentHandler,
-		MaterialHandler:     materialHandler,
-		AssignmentHandler:   assignmentHandler,
-		SubmissionHandler:   submissionHandler,
-		GradebookHandler:    gradebookHandler,
-		ForumHandler:        forumHandler,
-		NotificationHandler: notificationHandler,
-		ProgressHandler:     progressHandler,
-		ReportHandler:       reportHandler,
-		TokenVerifier:       tokens,
-		UploadsDir:          "uploads",
+		AuthHandler:          authHandler,
+		CourseHandler:        courseHandler,
+		CurriculumHandler:    curriculumHandler,
+		EnrollmentHandler:    enrollmentHandler,
+		MaterialHandler:      materialHandler,
+		AssignmentHandler:    assignmentHandler,
+		SubmissionHandler:    submissionHandler,
+		GradebookHandler:     gradebookHandler,
+		ForumHandler:         forumHandler,
+		NotificationHandler:  notificationHandler,
+		ProgressHandler:      progressHandler,
+		ReportHandler:        reportHandler,
+		PasswordResetHandler: passwordResetHandler,
+		RoleUpgradeHandler:   roleUpgradeHandler,
+		TokenVerifier:        tokens,
+		UploadsDir:           "uploads",
 	})
 
 	srv := &http.Server{

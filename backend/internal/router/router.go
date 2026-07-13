@@ -14,19 +14,21 @@ import (
 )
 
 type Deps struct {
-	AuthHandler         *handler.AuthHandler
-	CourseHandler       *handler.CourseHandler
-	CurriculumHandler   *handler.CurriculumHandler
-	EnrollmentHandler   *handler.EnrollmentHandler
-	MaterialHandler     *handler.MaterialHandler
-	AssignmentHandler   *handler.AssignmentHandler
-	SubmissionHandler   *handler.SubmissionHandler
-	GradebookHandler    *handler.GradebookHandler
-	ForumHandler        *handler.ForumHandler
-	NotificationHandler *handler.NotificationHandler
-	ProgressHandler     *handler.ProgressHandler
-	ReportHandler       *handler.ReportHandler
-	TokenVerifier       middleware.TokenVerifier
+	AuthHandler          *handler.AuthHandler
+	CourseHandler        *handler.CourseHandler
+	CurriculumHandler    *handler.CurriculumHandler
+	EnrollmentHandler    *handler.EnrollmentHandler
+	MaterialHandler      *handler.MaterialHandler
+	AssignmentHandler    *handler.AssignmentHandler
+	SubmissionHandler    *handler.SubmissionHandler
+	GradebookHandler     *handler.GradebookHandler
+	ForumHandler         *handler.ForumHandler
+	NotificationHandler  *handler.NotificationHandler
+	ProgressHandler      *handler.ProgressHandler
+	ReportHandler        *handler.ReportHandler
+	PasswordResetHandler *handler.PasswordResetHandler
+	RoleUpgradeHandler   *handler.RoleUpgradeHandler
+	TokenVerifier        middleware.TokenVerifier
 	// UploadsDir là thư mục lưu file vật lý (US4.1), phục vụ tĩnh qua
 	// /uploads/* để frontend tải xuống (US4.2).
 	UploadsDir string
@@ -65,8 +67,11 @@ func New(deps Deps) http.Handler {
 
 	r.Route("/api", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
-			r.Post("/register", deps.AuthHandler.Register) // US1.1
-			r.Post("/login", deps.AuthHandler.Login)       // US1.2
+			r.Post("/register", deps.AuthHandler.Register)               // US1.1
+			r.Post("/login", deps.AuthHandler.Login)                     // US1.2
+			r.Post("/forgot-username", deps.AuthHandler.ForgotUsername)  // US1.8, public
+			r.Post("/forgot-password", deps.PasswordResetHandler.Forgot) // US1.6, public
+			r.Post("/reset-password", deps.PasswordResetHandler.Reset)   // US1.6, public
 		})
 
 		r.Get("/courses", deps.CourseHandler.Search)                               // US3.1, public
@@ -90,6 +95,11 @@ func New(deps Deps) http.Handler {
 			r.Post("/courses/{id}/enroll", deps.EnrollmentHandler.Enroll) // US3.2, mọi user đã đăng nhập
 			r.Post("/courses/{id}/forum-posts", deps.ForumHandler.Create) // US6.1, mọi user đã đăng nhập
 
+			r.Get("/me", deps.AuthHandler.Me)                                // US1.4
+			r.Patch("/me", deps.AuthHandler.UpdateMe)                        // US1.4
+			r.Post("/me/avatar", deps.AuthHandler.UploadAvatar)              // US1.4
+			r.Post("/auth/change-password", deps.AuthHandler.ChangePassword) // US1.5
+
 			r.Get("/notifications", deps.NotificationHandler.ListMine)                 // US6.2
 			r.Get("/notifications/unread-count", deps.NotificationHandler.UnreadCount) // US6.2
 			r.Post("/notifications/{id}/read", deps.NotificationHandler.MarkRead)      // US6.2
@@ -99,6 +109,7 @@ func New(deps Deps) http.Handler {
 				r.Post("/assignments/{id}/submit", deps.SubmissionHandler.Submit)        // US5.2
 				r.Get("/assignments/{id}/my-submission", deps.SubmissionHandler.GetMine) // US5.2
 				r.Get("/me/progress", deps.ProgressHandler.Me)                           // US7.1
+				r.Post("/me/role-upgrade-request", deps.RoleUpgradeHandler.Create)       // US1.7
 			})
 
 			r.Group(func(r chi.Router) {
@@ -125,6 +136,10 @@ func New(deps Deps) http.Handler {
 				r.Use(middleware.RequireRole(user.RoleAdmin))
 				r.Get("/courses/pending", deps.CourseHandler.ListPending)   // US2.3, hàng chờ duyệt
 				r.Post("/courses/{id}/approve", deps.CourseHandler.Approve) // US2.3
+
+				r.Get("/role-upgrade-requests", deps.RoleUpgradeHandler.ListPending)           // US1.7
+				r.Post("/role-upgrade-requests/{id}/approve", deps.RoleUpgradeHandler.Approve) // US1.7
+				r.Post("/role-upgrade-requests/{id}/reject", deps.RoleUpgradeHandler.Reject)   // US1.7
 			})
 		})
 	})

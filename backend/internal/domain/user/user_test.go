@@ -50,6 +50,35 @@ func TestUser_SetPasswordHash(t *testing.T) {
 	assert.Equal(t, "$2a$10$hashedvalue", u.PasswordHash())
 }
 
+func TestUser_UpdateProfile(t *testing.T) {
+	u, err := user.NewUser("huy@vlu.edu.vn", "Huy", user.RoleStudent)
+	require.NoError(t, err)
+
+	err = u.UpdateProfile("Huynh Bao Huy", "0987654321", "2074802010001")
+	require.NoError(t, err)
+	assert.Equal(t, "Huynh Bao Huy", u.FullName())
+	assert.Equal(t, "0987654321", u.Phone())
+	assert.Equal(t, "2074802010001", u.StudentCode())
+
+	err = u.UpdateProfile("", "0987654321", "")
+	assert.ErrorIs(t, err, user.ErrEmptyFullName)
+
+	err = u.UpdateProfile("Huy", "0123", "")
+	assert.ErrorIs(t, err, user.ErrInvalidPhone)
+
+	// SĐT rỗng hợp lệ (tuỳ chọn, không bắt buộc điền)
+	err = u.UpdateProfile("Huy", "", "")
+	assert.NoError(t, err)
+}
+
+func TestUser_SetAvatarPath(t *testing.T) {
+	u, err := user.NewUser("huy@vlu.edu.vn", "Huy", user.RoleStudent)
+	require.NoError(t, err)
+
+	u.SetAvatarPath("avatars/1/photo.jpg")
+	assert.Equal(t, "avatars/1/photo.jpg", u.AvatarPath())
+}
+
 func TestUser_DeactivateBlocksLogin(t *testing.T) {
 	u, err := user.NewUser("huy@vlu.edu.vn", "Huy", user.RoleStudent)
 	require.NoError(t, err)

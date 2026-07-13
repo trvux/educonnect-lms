@@ -22,12 +22,12 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 
 func (r *UserRepository) Create(ctx context.Context, u *user.User) error {
 	const q = `
-		INSERT INTO users (email, password_hash, full_name, role, active, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO users (email, password_hash, full_name, role, active, phone, student_code, avatar_path, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id`
 	var id uint
 	err := r.pool.QueryRow(ctx, q,
-		u.Email(), u.PasswordHash(), u.FullName(), u.Role(), u.Active(), u.CreatedAt(), u.UpdatedAt(),
+		u.Email(), u.PasswordHash(), u.FullName(), u.Role(), u.Active(), u.Phone(), u.StudentCode(), u.AvatarPath(), u.CreatedAt(), u.UpdatedAt(),
 	).Scan(&id)
 	if err != nil {
 		return fmt.Errorf("postgres: tạo user lỗi: %w", err)
@@ -38,23 +38,34 @@ func (r *UserRepository) Create(ctx context.Context, u *user.User) error {
 
 func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*user.User, error) {
 	const q = `
-		SELECT id, email, password_hash, full_name, role, active, created_at, updated_at
+		SELECT id, email, password_hash, full_name, role, active, phone, student_code, avatar_path, created_at, updated_at
 		FROM users WHERE email = $1`
 	return r.scanOne(r.pool.QueryRow(ctx, q, email))
 }
 
 func (r *UserRepository) FindByID(ctx context.Context, id uint) (*user.User, error) {
 	const q = `
-		SELECT id, email, password_hash, full_name, role, active, created_at, updated_at
+		SELECT id, email, password_hash, full_name, role, active, phone, student_code, avatar_path, created_at, updated_at
 		FROM users WHERE id = $1`
 	return r.scanOne(r.pool.QueryRow(ctx, q, id))
 }
 
+// FindByPhone dùng cho US1.8 (quên email đăng nhập, tra cứu qua SĐT).
+func (r *UserRepository) FindByPhone(ctx context.Context, phone string) (*user.User, error) {
+	const q = `
+		SELECT id, email, password_hash, full_name, role, active, phone, student_code, avatar_path, created_at, updated_at
+		FROM users WHERE phone = $1`
+	return r.scanOne(r.pool.QueryRow(ctx, q, phone))
+}
+
 func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 	const q = `
-		UPDATE users SET email = $1, password_hash = $2, full_name = $3, role = $4, active = $5, updated_at = $6
-		WHERE id = $7`
-	tag, err := r.pool.Exec(ctx, q, u.Email(), u.PasswordHash(), u.FullName(), u.Role(), u.Active(), u.UpdatedAt(), u.ID())
+		UPDATE users SET email = $1, password_hash = $2, full_name = $3, role = $4, active = $5,
+			phone = $6, student_code = $7, avatar_path = $8, updated_at = $9
+		WHERE id = $10`
+	tag, err := r.pool.Exec(ctx, q,
+		u.Email(), u.PasswordHash(), u.FullName(), u.Role(), u.Active(), u.Phone(), u.StudentCode(), u.AvatarPath(), u.UpdatedAt(), u.ID(),
+	)
 	if err != nil {
 		return fmt.Errorf("postgres: cập nhật user lỗi: %w", err)
 	}
@@ -66,18 +77,19 @@ func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
 
 func (r *UserRepository) scanOne(row pgx.Row) (*user.User, error) {
 	var (
-		id                    uint
-		email, hash, fullName string
-		role                  user.Role
-		active                bool
-		createdAt, updatedAt  time.Time
+		id                             uint
+		email, hash, fullName          string
+		role                           user.Role
+		active                         bool
+		phone, studentCode, avatarPath string
+		createdAt, updatedAt           time.Time
 	)
-	err := row.Scan(&id, &email, &hash, &fullName, &role, &active, &createdAt, &updatedAt)
+	err := row.Scan(&id, &email, &hash, &fullName, &role, &active, &phone, &studentCode, &avatarPath, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, user.ErrNotFound
 		}
 		return nil, fmt.Errorf("postgres: đọc dữ liệu user lỗi: %w", err)
 	}
-	return user.Rehydrate(id, email, hash, fullName, role, active, createdAt, updatedAt), nil
+	return user.Rehydrate(id, email, hash, fullName, role, active, phone, studentCode, avatarPath, createdAt, updatedAt), nil
 }
