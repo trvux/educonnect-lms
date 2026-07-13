@@ -22,8 +22,20 @@ export type Lesson = {
   position: number;
 };
 
+// US4.10 — trạng thái hoàn thành/khóa của 1 bài học, trả về từ
+// GET /courses/:id/lesson-progress (theo góc nhìn người dùng hiện tại).
+export type LessonProgressEntry = {
+  lesson_id: number;
+  completed: boolean;
+  locked: boolean;
+};
+
+// US4.9/US4.10 — bài học trong outline có kèm completed/locked (chỉ có ý
+// nghĩa với học viên; giảng viên/admin luôn completed=false, locked=false).
+export type OutlineLesson = Lesson & { completed: boolean; locked: boolean };
+
 // US4.9 — chương kèm danh sách bài học lồng sẵn, dùng cho sidebar course player.
-export type CourseOutlineChapter = Chapter & { lessons: Lesson[] };
+export type CourseOutlineChapter = Chapter & { lessons: OutlineLesson[] };
 
 export type MaterialFileType = "pdf" | "doc" | "excel" | "ppt" | "video" | "archive";
 

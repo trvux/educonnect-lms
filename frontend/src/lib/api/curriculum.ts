@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { Chapter, CourseOutlineChapter, Lesson } from "@/lib/types";
+import type { Chapter, CourseOutlineChapter, Lesson, LessonProgressEntry } from "@/lib/types";
 
 // US2.2
 export async function listChapters(courseId: number) {
@@ -55,15 +55,38 @@ export async function reorderLessons(chapterId: number, ids: number[]) {
   return res.data;
 }
 
-// US4.9 — cây chương/bài học đầy đủ của khóa học, dùng để dựng sidebar
-// "course player". Không có endpoint gộp sẵn ở backend nên gọi tuần tự:
-// lấy danh sách chương rồi lấy bài học của từng chương song song.
+// US4.10 — trạng thái hoàn thành + khóa của mọi bài học trong khóa học,
+// theo góc nhìn người dùng hiện tại (backend tự tính, không tin client).
+export async function getLessonProgress(courseId: number) {
+  const res = await apiClient.get<LessonProgressEntry[]>(`/courses/${courseId}/lesson-progress`);
+  return res.data;
+}
+
+// US4.10 — học viên đánh dấu đã học xong 1 bài; backend chặn (403) nếu bài
+// đang bị khóa (bài trước chưa hoàn thành), idempotent nếu gọi lại.
+export async function markLessonComplete(lessonId: number) {
+  await apiClient.post(`/lessons/${lessonId}/complete`);
+}
+
+// US4.9/US4.10 — cây chương/bài học đầy đủ của khóa học kèm trạng thái
+// hoàn thành/khóa từng bài, dùng để dựng sidebar "course player". Không có
+// endpoint gộp sẵn ở backend nên gọi tuần tự: chapters + lesson-progress
+// song song, rồi lessons của từng chương, ghép completed/locked vào.
 export async function getCourseOutline(courseId: number): Promise<CourseOutlineChapter[]> {
-  const chapters = await listChapters(courseId);
+  const [chapters, progress] = await Promise.all([listChapters(courseId), getLessonProgress(courseId)]);
+  const progressByLessonId = new Map(progress.map((p) => [p.lesson_id, p]));
+
   return Promise.all(
-    chapters.map(async (chapter) => ({
-      ...chapter,
-      lessons: await listLessons(chapter.id),
-    }))
+    chapters.map(async (chapter) => {
+      const lessons = await listLessons(chapter.id);
+      return {
+        ...chapter,
+        lessons: lessons.map((l) => ({
+          ...l,
+          completed: progressByLessonId.get(l.id)?.completed ?? false,
+          locked: progressByLessonId.get(l.id)?.locked ?? false,
+        })),
+      };
+    })
   );
 }

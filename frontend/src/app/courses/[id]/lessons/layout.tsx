@@ -4,7 +4,7 @@ import { use } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeftIcon } from "@phosphor-icons/react";
+import { ArrowLeftIcon, CheckCircleIcon, LockIcon } from "@phosphor-icons/react";
 
 import { getCourse } from "@/lib/api/courses";
 import { getCourseOutline } from "@/lib/api/curriculum";
@@ -89,9 +89,27 @@ export default function CoursePlayerLayout({
                 <SidebarMenu>
                   {chapter.lessons.map((lesson) => {
                     const href = `/courses/${courseId}/lessons/${lesson.id}`;
+                    // US4.10 — bài học bị khóa (bài trước chưa hoàn thành)
+                    // không cho bấm vào, hiện icon khóa thay vì icon check.
+                    if (lesson.locked) {
+                      return (
+                        <SidebarMenuItem key={lesson.id}>
+                          <SidebarMenuButton
+                            disabled
+                            className="cursor-not-allowed text-muted-foreground"
+                          >
+                            <LockIcon className="size-4 shrink-0" />
+                            {lesson.title}
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    }
                     return (
                       <SidebarMenuItem key={lesson.id}>
                         <SidebarMenuButton isActive={pathname === href} render={<Link href={href} />}>
+                          {lesson.completed && (
+                            <CheckCircleIcon className="size-4 shrink-0 text-primary" weight="fill" />
+                          )}
                           {lesson.title}
                         </SidebarMenuButton>
                       </SidebarMenuItem>

@@ -21,6 +21,7 @@ import (
 	enrollmentservice "educonnect-lms/backend/internal/service/enrollment"
 	forumservice "educonnect-lms/backend/internal/service/forum"
 	gradebookservice "educonnect-lms/backend/internal/service/gradebook"
+	lessoncompletionservice "educonnect-lms/backend/internal/service/lessoncompletion"
 	materialservice "educonnect-lms/backend/internal/service/material"
 	notificationservice "educonnect-lms/backend/internal/service/notification"
 	progressservice "educonnect-lms/backend/internal/service/progress"
@@ -67,6 +68,7 @@ func main() {
 	passwordResetRepo := postgres.NewPasswordResetRepository(pool)
 	emailVerificationRepo := postgres.NewEmailVerificationRepository(pool)
 	roleUpgradeRepo := postgres.NewRoleUpgradeRepository(pool)
+	lessonCompletionRepo := postgres.NewLessonCompletionRepository(pool)
 	hasher := security.NewBcryptHasher()
 	tokens := security.NewJWTIssuer(cfg.JWTSecret, 24*time.Hour)
 	// US4.5: token riêng cho <video src="...">, TTL ngắn hơn hẳn JWT đăng
@@ -93,6 +95,7 @@ func main() {
 	notificationSvc := notificationservice.NewService(notificationRepo, enrollmentRepo, courseRepo)
 	progressSvc := progressservice.NewService(progressRepo)
 	reportSvc := reportservice.NewService(reportRepo)
+	lessonCompletionSvc := lessoncompletionservice.NewService(lessonCompletionRepo, lessonRepo, chapterRepo, courseRepo, enrollmentRepo)
 
 	// tầng HTTP
 	authHandler := handler.NewAuthHandler(authSvc, log, cfg.AllowRoleOnRegister)
@@ -109,25 +112,27 @@ func main() {
 	reportHandler := handler.NewReportHandler(reportSvc, log)
 	passwordResetHandler := handler.NewPasswordResetHandler(authSvc, log)
 	roleUpgradeHandler := handler.NewRoleUpgradeHandler(roleUpgradeSvc, log)
+	lessonCompletionHandler := handler.NewLessonCompletionHandler(lessonCompletionSvc, log)
 
 	r := router.New(router.Deps{
-		AuthHandler:          authHandler,
-		CourseHandler:        courseHandler,
-		CurriculumHandler:    curriculumHandler,
-		EnrollmentHandler:    enrollmentHandler,
-		MaterialHandler:      materialHandler,
-		AssignmentHandler:    assignmentHandler,
-		SubmissionHandler:    submissionHandler,
-		GradebookHandler:     gradebookHandler,
-		ForumHandler:         forumHandler,
-		NotificationHandler:  notificationHandler,
-		ProgressHandler:      progressHandler,
-		ReportHandler:        reportHandler,
-		PasswordResetHandler: passwordResetHandler,
-		RoleUpgradeHandler:   roleUpgradeHandler,
-		TokenVerifier:        tokens,
-		StreamTokenVerifier:  streamTokens,
-		UploadsDir:           "uploads",
+		AuthHandler:             authHandler,
+		CourseHandler:           courseHandler,
+		CurriculumHandler:       curriculumHandler,
+		EnrollmentHandler:       enrollmentHandler,
+		MaterialHandler:         materialHandler,
+		AssignmentHandler:       assignmentHandler,
+		SubmissionHandler:       submissionHandler,
+		GradebookHandler:        gradebookHandler,
+		ForumHandler:            forumHandler,
+		NotificationHandler:     notificationHandler,
+		ProgressHandler:         progressHandler,
+		ReportHandler:           reportHandler,
+		PasswordResetHandler:    passwordResetHandler,
+		RoleUpgradeHandler:      roleUpgradeHandler,
+		LessonCompletionHandler: lessonCompletionHandler,
+		TokenVerifier:           tokens,
+		StreamTokenVerifier:     streamTokens,
+		UploadsDir:              "uploads",
 	})
 
 	srv := &http.Server{

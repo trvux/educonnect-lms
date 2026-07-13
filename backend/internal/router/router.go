@@ -14,21 +14,22 @@ import (
 )
 
 type Deps struct {
-	AuthHandler          *handler.AuthHandler
-	CourseHandler        *handler.CourseHandler
-	CurriculumHandler    *handler.CurriculumHandler
-	EnrollmentHandler    *handler.EnrollmentHandler
-	MaterialHandler      *handler.MaterialHandler
-	AssignmentHandler    *handler.AssignmentHandler
-	SubmissionHandler    *handler.SubmissionHandler
-	GradebookHandler     *handler.GradebookHandler
-	ForumHandler         *handler.ForumHandler
-	NotificationHandler  *handler.NotificationHandler
-	ProgressHandler      *handler.ProgressHandler
-	ReportHandler        *handler.ReportHandler
-	PasswordResetHandler *handler.PasswordResetHandler
-	RoleUpgradeHandler   *handler.RoleUpgradeHandler
-	TokenVerifier        middleware.TokenVerifier
+	AuthHandler             *handler.AuthHandler
+	CourseHandler           *handler.CourseHandler
+	CurriculumHandler       *handler.CurriculumHandler
+	EnrollmentHandler       *handler.EnrollmentHandler
+	MaterialHandler         *handler.MaterialHandler
+	AssignmentHandler       *handler.AssignmentHandler
+	SubmissionHandler       *handler.SubmissionHandler
+	GradebookHandler        *handler.GradebookHandler
+	ForumHandler            *handler.ForumHandler
+	NotificationHandler     *handler.NotificationHandler
+	ProgressHandler         *handler.ProgressHandler
+	ReportHandler           *handler.ReportHandler
+	PasswordResetHandler    *handler.PasswordResetHandler
+	RoleUpgradeHandler      *handler.RoleUpgradeHandler
+	LessonCompletionHandler *handler.LessonCompletionHandler
+	TokenVerifier           middleware.TokenVerifier
 	// StreamTokenVerifier xác thực token ngắn hạn riêng cho US4.5 (query
 	// param "token", khác JWT đăng nhập dài hạn ở TokenVerifier).
 	StreamTokenVerifier middleware.TokenVerifier
@@ -119,16 +120,19 @@ func New(deps Deps) http.Handler {
 			r.Get("/lessons/{id}/materials", deps.MaterialHandler.List)      // US4.2/US4.3, cần đăng nhập + kiểm tra quyền
 			r.Get("/materials/{id}/download", deps.MaterialHandler.Download) // US4.3, cần đăng nhập + kiểm tra quyền
 
+			r.Get("/courses/{id}/lesson-progress", deps.LessonCompletionHandler.ListForCourse) // US4.10
+
 			r.Get("/notifications", deps.NotificationHandler.ListMine)                 // US6.2
 			r.Get("/notifications/unread-count", deps.NotificationHandler.UnreadCount) // US6.2
 			r.Post("/notifications/{id}/read", deps.NotificationHandler.MarkRead)      // US6.2
 
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireRole(user.RoleStudent))
-				r.Post("/assignments/{id}/submit", deps.SubmissionHandler.Submit)        // US5.2
-				r.Get("/assignments/{id}/my-submission", deps.SubmissionHandler.GetMine) // US5.2
-				r.Get("/me/progress", deps.ProgressHandler.Me)                           // US7.1
-				r.Post("/me/role-upgrade-request", deps.RoleUpgradeHandler.Create)       // US1.7
+				r.Post("/assignments/{id}/submit", deps.SubmissionHandler.Submit)           // US5.2
+				r.Get("/assignments/{id}/my-submission", deps.SubmissionHandler.GetMine)    // US5.2
+				r.Get("/me/progress", deps.ProgressHandler.Me)                              // US7.1
+				r.Post("/me/role-upgrade-request", deps.RoleUpgradeHandler.Create)          // US1.7
+				r.Post("/lessons/{id}/complete", deps.LessonCompletionHandler.MarkComplete) // US4.10
 			})
 
 			r.Group(func(r chi.Router) {
