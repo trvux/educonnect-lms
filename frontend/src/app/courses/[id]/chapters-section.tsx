@@ -3,16 +3,20 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { DownloadIcon, PlusIcon, UploadIcon } from "@phosphor-icons/react";
+import { DownloadIcon, PencilIcon, PlusIcon, TrashIcon, UploadIcon } from "@phosphor-icons/react";
 
 import {
   listChapters,
   createChapter,
+  renameChapter,
+  deleteChapter,
   listLessons,
   createLesson,
+  renameLesson,
+  deleteLesson,
 } from "@/lib/api/curriculum";
 import { listMaterials, uploadMaterial, downloadMaterial } from "@/lib/api/materials";
-import type { MaterialFileType } from "@/lib/types";
+import type { Chapter, Lesson, MaterialFileType } from "@/lib/types";
 import { AssignmentsSection } from "./assignments-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +35,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // US4.4 — whitelist định dạng file, khớp danh sách backend chấp nhận
 // (internal/domain/material/material.go#extensionToFileType). Thuộc tính
@@ -48,13 +62,17 @@ const fileTypeLabel: Record<MaterialFileType, string> = {
   archive: "Nén",
 };
 
-// US2.2 (chương/bài học) + US4.1/US4.2 (tài liệu). Mobile-first: mỗi chương
-// là 1 Accordion item để tiết kiệm không gian màn hình nhỏ; bài học/tài
-// liệu hiện dạng danh sách dọc, không cần bảng vì ít cột dữ liệu.
+// US2.2 (chương/bài học) + US4.1/US4.2 (tài liệu) + US4.6 (sửa/xóa). Mobile-
+// first: mỗi chương là 1 Accordion item để tiết kiệm không gian màn hình
+// nhỏ; bài học/tài liệu hiện dạng danh sách dọc, không cần bảng vì ít cột
+// dữ liệu.
 export function ChaptersSection({ courseId, canManage }: { courseId: number; canManage: boolean }) {
   const queryClient = useQueryClient();
   const [newChapterTitle, setNewChapterTitle] = useState("");
   const [chapterDialogOpen, setChapterDialogOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<Chapter | null>(null);
+  const [renameTitle, setRenameTitle] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Chapter | null>(null);
 
   const { data: chapters, isLoading } = useQuery({
     queryKey: ["chapters", courseId],
@@ -70,6 +88,32 @@ export function ChaptersSection({ courseId, canManage }: { courseId: number; can
       queryClient.invalidateQueries({ queryKey: ["chapters", courseId] });
     },
     onError: () => toast.error("Thêm chương thất bại"),
+  });
+
+  const renameChapterMutation = useMutation({
+    mutationFn: () => renameChapter(renameTarget!.id, renameTitle),
+    onSuccess: () => {
+      toast.success("Đã đổi tên chương");
+      setRenameTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["chapters", courseId] });
+    },
+    onError: () => toast.error("Đổi tên chương thất bại"),
+  });
+
+  const deleteChapterMutation = useMutation({
+    mutationFn: () => deleteChapter(deleteTarget!.id),
+    onSuccess: () => {
+      toast.success("Đã xóa chương");
+      setDeleteTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["chapters", courseId] });
+    },
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+        "Xóa chương thất bại";
+      toast.error(message);
+      setDeleteTarget(null);
+    },
   });
 
   return (
@@ -112,13 +156,80 @@ export function ChaptersSection({ courseId, canManage }: { courseId: number; can
       <Accordion multiple className="mt-2">
         {chapters?.map((chapter) => (
           <AccordionItem key={chapter.id} value={String(chapter.id)}>
-            <AccordionTrigger>{chapter.title}</AccordionTrigger>
+            <div className="flex items-center">
+              <AccordionTrigger className="flex-1">{chapter.title}</AccordionTrigger>
+              {canManage && (
+                <div className="flex items-center gap-1 pr-2">
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Đổi tên chương"
+                    onClick={() => {
+                      setRenameTarget(chapter);
+                      setRenameTitle(chapter.title);
+                    }}
+                  >
+                    <PencilIcon className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Xóa chương"
+                    onClick={() => setDeleteTarget(chapter)}
+                  >
+                    <TrashIcon className="size-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
             <AccordionContent>
               <LessonsSection chapterId={chapter.id} canManage={canManage} />
             </AccordionContent>
           </AccordionItem>
         ))}
       </Accordion>
+
+      <Dialog
+        open={renameTarget !== null}
+        onOpenChange={(open) => !open && setRenameTarget(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Đổi tên chương</DialogTitle>
+          </DialogHeader>
+          <Input value={renameTitle} onChange={(e) => setRenameTitle(e.target.value)} />
+          <DialogFooter>
+            <Button
+              onClick={() => renameChapterMutation.mutate()}
+              disabled={!renameTitle || renameChapterMutation.isPending}
+            >
+              Lưu
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xóa chương &quot;{deleteTarget?.title}&quot;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Chỉ xóa được nếu chương không còn bài học nào bên trong. Hành động này không thể hoàn tác.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteChapterMutation.mutate()}
+              disabled={deleteChapterMutation.isPending}
+            >
+              Xóa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -127,6 +238,9 @@ function LessonsSection({ chapterId, canManage }: { chapterId: number; canManage
   const queryClient = useQueryClient();
   const [newLessonTitle, setNewLessonTitle] = useState("");
   const [lessonDialogOpen, setLessonDialogOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<Lesson | null>(null);
+  const [renameTitle, setRenameTitle] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Lesson | null>(null);
 
   const { data: lessons, isLoading } = useQuery({
     queryKey: ["lessons", chapterId],
@@ -144,6 +258,32 @@ function LessonsSection({ chapterId, canManage }: { chapterId: number; canManage
     onError: () => toast.error("Thêm bài học thất bại"),
   });
 
+  const renameLessonMutation = useMutation({
+    mutationFn: () => renameLesson(renameTarget!.id, renameTitle),
+    onSuccess: () => {
+      toast.success("Đã đổi tên bài học");
+      setRenameTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["lessons", chapterId] });
+    },
+    onError: () => toast.error("Đổi tên bài học thất bại"),
+  });
+
+  const deleteLessonMutation = useMutation({
+    mutationFn: () => deleteLesson(deleteTarget!.id),
+    onSuccess: () => {
+      toast.success("Đã xóa bài học");
+      setDeleteTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["lessons", chapterId] });
+    },
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+        "Xóa bài học thất bại";
+      toast.error(message);
+      setDeleteTarget(null);
+    },
+  });
+
   return (
     <div className="flex flex-col gap-3 pl-1">
       {isLoading && <p className="text-sm text-muted-foreground">Đang tải bài học...</p>}
@@ -153,7 +293,34 @@ function LessonsSection({ chapterId, canManage }: { chapterId: number; canManage
 
       {lessons?.map((lesson) => (
         <div key={lesson.id} className="rounded-md border p-3">
-          <p className="font-medium">{lesson.title}</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-medium">{lesson.title}</p>
+            {canManage && (
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="Đổi tên bài học"
+                  onClick={() => {
+                    setRenameTarget(lesson);
+                    setRenameTitle(lesson.title);
+                  }}
+                >
+                  <PencilIcon className="size-4" />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="Xóa bài học"
+                  onClick={() => setDeleteTarget(lesson)}
+                >
+                  <TrashIcon className="size-4" />
+                </Button>
+              </div>
+            )}
+          </div>
           <MaterialsList lessonId={lesson.id} canManage={canManage} />
           <AssignmentsSection lessonId={lesson.id} canManage={canManage} />
         </div>
@@ -185,6 +352,46 @@ function LessonsSection({ chapterId, canManage }: { chapterId: number; canManage
           </DialogContent>
         </Dialog>
       )}
+
+      <Dialog
+        open={renameTarget !== null}
+        onOpenChange={(open) => !open && setRenameTarget(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Đổi tên bài học</DialogTitle>
+          </DialogHeader>
+          <Input value={renameTitle} onChange={(e) => setRenameTitle(e.target.value)} />
+          <DialogFooter>
+            <Button
+              onClick={() => renameLessonMutation.mutate()}
+              disabled={!renameTitle || renameLessonMutation.isPending}
+            >
+              Lưu
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xóa bài học &quot;{deleteTarget?.title}&quot;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Chỉ xóa được nếu bài học không còn tài liệu/bài tập bên trong. Hành động này không thể hoàn tác.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteLessonMutation.mutate()}
+              disabled={deleteLessonMutation.isPending}
+            >
+              Xóa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

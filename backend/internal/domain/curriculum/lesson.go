@@ -10,6 +10,7 @@ var (
 	ErrEmptyLessonTitle = errors.New("lesson: tiêu đề là bắt buộc")
 	ErrInvalidChapterID = errors.New("lesson: chapter id là bắt buộc")
 	ErrLessonNotFound   = errors.New("lesson: không tìm thấy")
+	ErrLessonNotEmpty   = errors.New("lesson: còn tài liệu hoặc bài tập bên trong, xóa hết trước")
 )
 
 // Lesson là 1 bài học nằm trong 1 Chapter (US2.2). Tài liệu bài giảng
@@ -67,4 +68,5 @@ type LessonRepository interface {
 	ListByChapter(ctx context.Context, chapterID uint) ([]*Lesson, error)
 	CountByChapter(ctx context.Context, chapterID uint) (int, error)
 	Update(ctx context.Context, l *Lesson) error
+	Delete(ctx context.Context, id uint) error
 }

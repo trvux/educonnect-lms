@@ -53,4 +53,24 @@ func TestChapterAndLessonRepository(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, chapters, 1)
 	assert.Equal(t, "Chuong 1: Nhap mon", chapters[0].Title())
+
+	// US4.6 — không xóa được chương/bài học còn con bên trong (ràng buộc
+	// khóa ngoại thật ở Postgres, dịch sang lỗi domain có ý nghĩa).
+	err = chapterRepo.Delete(ctx, ch.ID())
+	assert.ErrorIs(t, err, curriculum.ErrChapterNotEmpty, "chương còn bài học không được xóa")
+
+	require.NoError(t, ch.Rename("Chuong 1 (da sua)"))
+	require.NoError(t, chapterRepo.Update(ctx, ch))
+	reloaded, err := chapterRepo.FindByID(ctx, ch.ID())
+	require.NoError(t, err)
+	assert.Equal(t, "Chuong 1 (da sua)", reloaded.Title())
+
+	require.NoError(t, lessonRepo.Delete(ctx, l.ID()))
+	_, err = lessonRepo.FindByID(ctx, l.ID())
+	assert.ErrorIs(t, err, curriculum.ErrLessonNotFound, "bai hoc phai bi xoa that")
+
+	require.NoError(t, chapterRepo.Delete(ctx, ch.ID()), "chuong rong (het bai hoc) phai xoa duoc")
+
+	err = chapterRepo.Delete(ctx, ch.ID())
+	assert.ErrorIs(t, err, curriculum.ErrChapterNotFound, "xoa lan 2 phai bao khong tim thay")
 }

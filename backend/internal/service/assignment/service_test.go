@@ -28,6 +28,7 @@ func (r *fakeLessonRepo) ListByChapter(_ context.Context, _ uint) ([]*curriculum
 }
 func (r *fakeLessonRepo) CountByChapter(_ context.Context, _ uint) (int, error) { return 0, nil }
 func (r *fakeLessonRepo) Update(_ context.Context, _ *curriculum.Lesson) error  { return nil }
+func (r *fakeLessonRepo) Delete(_ context.Context, _ uint) error                { return nil }
 
 type fakeAssignmentRepo struct {
 	items  []*assignment.Assignment

@@ -12,6 +12,7 @@ var (
 	ErrEmptyChapterTitle = errors.New("chapter: tiêu đề là bắt buộc")
 	ErrInvalidCourseID   = errors.New("chapter: course id là bắt buộc")
 	ErrChapterNotFound   = errors.New("chapter: không tìm thấy")
+	ErrChapterNotEmpty   = errors.New("chapter: còn bài học bên trong, xóa hết bài học trước")
 )
 
 // Chapter là 1 chương trong khóa học, có thứ tự hiển thị (Position) để
@@ -74,4 +75,5 @@ type ChapterRepository interface {
 	ListByCourse(ctx context.Context, courseID uint) ([]*Chapter, error)
 	CountByCourse(ctx context.Context, courseID uint) (int, error)
 	Update(ctx context.Context, c *Chapter) error
+	Delete(ctx context.Context, id uint) error
 }

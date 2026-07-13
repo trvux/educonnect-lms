@@ -9,6 +9,7 @@ import (
 	"educonnect-lms/backend/internal/domain/curriculum"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -92,6 +93,21 @@ func (r *LessonRepository) Update(ctx context.Context, l *curriculum.Lesson) err
 	tag, err := r.pool.Exec(ctx, q, l.Title(), l.Position(), l.UpdatedAt(), l.ID())
 	if err != nil {
 		return fmt.Errorf("postgres: cập nhật lesson lỗi: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return curriculum.ErrLessonNotFound
+	}
+	return nil
+}
+
+func (r *LessonRepository) Delete(ctx context.Context, id uint) error {
+	tag, err := r.pool.Exec(ctx, `DELETE FROM lessons WHERE id = $1`, id)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == foreignKeyViolation {
+			return curriculum.ErrLessonNotEmpty
+		}
+		return fmt.Errorf("postgres: xóa lesson lỗi: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return curriculum.ErrLessonNotFound

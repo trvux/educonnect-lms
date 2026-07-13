@@ -9,8 +9,14 @@ import (
 	"educonnect-lms/backend/internal/domain/curriculum"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// foreignKeyViolation là mã lỗi Postgres khi 1 thao tác vi phạm ràng buộc
+// khóa ngoại (vd DELETE chapter còn lesson tham chiếu tới) — dùng để dịch
+// lỗi hạ tầng thành lỗi domain có ý nghĩa nghiệp vụ (US4.6).
+const foreignKeyViolation = "23503"
 
 type ChapterRepository struct {
 	pool *pgxpool.Pool
@@ -92,6 +98,21 @@ func (r *ChapterRepository) Update(ctx context.Context, c *curriculum.Chapter) e
 	tag, err := r.pool.Exec(ctx, q, c.Title(), c.Position(), c.UpdatedAt(), c.ID())
 	if err != nil {
 		return fmt.Errorf("postgres: cập nhật chapter lỗi: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return curriculum.ErrChapterNotFound
+	}
+	return nil
+}
+
+func (r *ChapterRepository) Delete(ctx context.Context, id uint) error {
+	tag, err := r.pool.Exec(ctx, `DELETE FROM chapters WHERE id = $1`, id)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == foreignKeyViolation {
+			return curriculum.ErrChapterNotEmpty
+		}
+		return fmt.Errorf("postgres: xóa chapter lỗi: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return curriculum.ErrChapterNotFound

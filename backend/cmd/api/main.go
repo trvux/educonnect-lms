@@ -79,7 +79,7 @@ func main() {
 	authSvc := authservice.NewService(userRepo, hasher, tokens, fileStorage, passwordResetRepo, emailVerificationRepo, emailSender)
 	roleUpgradeSvc := roleupgradeservice.NewService(roleUpgradeRepo, userRepo)
 	courseSvc := courseservice.NewService(courseRepo)
-	curriculumSvc := curriculumservice.NewService(chapterRepo, lessonRepo)
+	curriculumSvc := curriculumservice.NewService(chapterRepo, lessonRepo, courseRepo)
 	enrollmentSvc := enrollmentservice.NewService(enrollmentRepo, courseRepo, userRepo)
 	materialSvc := materialservice.NewService(materialRepo, lessonRepo, chapterRepo, courseRepo, enrollmentRepo, fileStorage)
 	assignmentSvc := assignmentservice.NewService(assignmentRepo, lessonRepo)

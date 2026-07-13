@@ -7,18 +7,24 @@ import (
 	"net/http"
 
 	"educonnect-lms/backend/internal/domain/curriculum"
+	"educonnect-lms/backend/internal/domain/user"
+	"educonnect-lms/backend/internal/handler/middleware"
 
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )
 
 // CurriculumService là tập con method của *curriculumservice.Service mà
-// handler cần (US2.2).
+// handler cần (US2.2, US4.6).
 type CurriculumService interface {
 	CreateChapter(ctx context.Context, courseID uint, title string) (*curriculum.Chapter, error)
 	ListChapters(ctx context.Context, courseID uint) ([]*curriculum.Chapter, error)
+	RenameChapter(ctx context.Context, chapterID uint, title string, userID uint, role user.Role) (*curriculum.Chapter, error)
+	DeleteChapter(ctx context.Context, chapterID, userID uint, role user.Role) error
 	CreateLesson(ctx context.Context, chapterID uint, title string) (*curriculum.Lesson, error)
 	ListLessons(ctx context.Context, chapterID uint) ([]*curriculum.Lesson, error)
+	RenameLesson(ctx context.Context, lessonID uint, title string, userID uint, role user.Role) (*curriculum.Lesson, error)
+	DeleteLesson(ctx context.Context, lessonID, userID uint, role user.Role) error
 }
 
 type CurriculumHandler struct {
@@ -76,6 +82,51 @@ func (h *CurriculumHandler) CreateChapter(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusCreated, toChapterResponse(ch))
 }
 
+// RenameChapter xử lý PATCH /api/chapters/{id} (US4.6, chỉ GV sở hữu khóa
+// học hoặc admin).
+func (h *CurriculumHandler) RenameChapter(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.ClaimsFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "thiếu thông tin xác thực")
+		return
+	}
+	chapterID, err := parseUintParam(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "chapter id không hợp lệ")
+		return
+	}
+	var req titleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "body JSON không hợp lệ")
+		return
+	}
+	ch, err := h.service.RenameChapter(r.Context(), chapterID, req.Title, claims.UserID, claims.Role)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toChapterResponse(ch))
+}
+
+// DeleteChapter xử lý DELETE /api/chapters/{id} (US4.6).
+func (h *CurriculumHandler) DeleteChapter(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.ClaimsFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "thiếu thông tin xác thực")
+		return
+	}
+	chapterID, err := parseUintParam(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "chapter id không hợp lệ")
+		return
+	}
+	if err := h.service.DeleteChapter(r.Context(), chapterID, claims.UserID, claims.Role); err != nil {
+		h.handleError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, nil)
+}
+
 // ListChapters xử lý GET /api/courses/{courseId}/chapters (public).
 func (h *CurriculumHandler) ListChapters(w http.ResponseWriter, r *http.Request) {
 	courseID, err := parseUintParam(r, "courseId")
@@ -115,6 +166,50 @@ func (h *CurriculumHandler) CreateLesson(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusCreated, toLessonResponse(l))
 }
 
+// RenameLesson xử lý PATCH /api/lessons/{id} (US4.6).
+func (h *CurriculumHandler) RenameLesson(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.ClaimsFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "thiếu thông tin xác thực")
+		return
+	}
+	lessonID, err := parseUintParam(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "lesson id không hợp lệ")
+		return
+	}
+	var req titleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "body JSON không hợp lệ")
+		return
+	}
+	l, err := h.service.RenameLesson(r.Context(), lessonID, req.Title, claims.UserID, claims.Role)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toLessonResponse(l))
+}
+
+// DeleteLesson xử lý DELETE /api/lessons/{id} (US4.6).
+func (h *CurriculumHandler) DeleteLesson(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.ClaimsFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "thiếu thông tin xác thực")
+		return
+	}
+	lessonID, err := parseUintParam(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "lesson id không hợp lệ")
+		return
+	}
+	if err := h.service.DeleteLesson(r.Context(), lessonID, claims.UserID, claims.Role); err != nil {
+		h.handleError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, nil)
+}
+
 // ListLessons xử lý GET /api/chapters/{chapterId}/lessons (public).
 func (h *CurriculumHandler) ListLessons(w http.ResponseWriter, r *http.Request) {
 	chapterID, err := parseUintParam(r, "chapterId")
@@ -142,6 +237,8 @@ func (h *CurriculumHandler) handleError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, curriculum.ErrChapterNotFound), errors.Is(err, curriculum.ErrLessonNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
+	case errors.Is(err, curriculum.ErrChapterNotEmpty), errors.Is(err, curriculum.ErrLessonNotEmpty):
+		writeError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, curriculum.ErrEmptyChapterTitle), errors.Is(err, curriculum.ErrEmptyLessonTitle),
 		errors.Is(err, curriculum.ErrInvalidCourseID), errors.Is(err, curriculum.ErrInvalidChapterID):
 		writeError(w, http.StatusBadRequest, err.Error())

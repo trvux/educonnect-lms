@@ -127,7 +127,11 @@ func New(deps Deps) http.Handler {
 				r.Get("/courses/{id}/students", deps.EnrollmentHandler.ListStudents) // US3.3
 
 				r.Post("/courses/{courseId}/chapters", deps.CurriculumHandler.CreateChapter) // US2.2
+				r.Patch("/chapters/{id}", deps.CurriculumHandler.RenameChapter)              // US4.6
+				r.Delete("/chapters/{id}", deps.CurriculumHandler.DeleteChapter)             // US4.6
 				r.Post("/chapters/{chapterId}/lessons", deps.CurriculumHandler.CreateLesson) // US2.2
+				r.Patch("/lessons/{id}", deps.CurriculumHandler.RenameLesson)                // US4.6
+				r.Delete("/lessons/{id}", deps.CurriculumHandler.DeleteLesson)               // US4.6
 				r.Post("/lessons/{id}/materials", deps.MaterialHandler.Upload)               // US4.1
 				r.Post("/lessons/{id}/assignments", deps.AssignmentHandler.Create)           // US5.1
 

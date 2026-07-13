@@ -87,6 +87,7 @@ func (r *fakeLessonRepo) ListByChapter(_ context.Context, _ uint) ([]*curriculum
 }
 func (r *fakeLessonRepo) CountByChapter(_ context.Context, _ uint) (int, error) { return 0, nil }
 func (r *fakeLessonRepo) Update(_ context.Context, _ *curriculum.Lesson) error  { return nil }
+func (r *fakeLessonRepo) Delete(_ context.Context, _ uint) error                { return nil }
 
 type fakeChapterRepo struct{ items map[uint]*curriculum.Chapter }
 
@@ -103,6 +104,7 @@ func (r *fakeChapterRepo) ListByCourse(_ context.Context, _ uint) ([]*curriculum
 }
 func (r *fakeChapterRepo) CountByCourse(_ context.Context, _ uint) (int, error)  { return 0, nil }
 func (r *fakeChapterRepo) Update(_ context.Context, _ *curriculum.Chapter) error { return nil }
+func (r *fakeChapterRepo) Delete(_ context.Context, _ uint) error                { return nil }
 
 type fakeCourseGetter struct{ items map[uint]*course.Course }
 
