@@ -7,6 +7,7 @@ import (
 	"educonnect-lms/backend/internal/domain/assignment"
 	"educonnect-lms/backend/internal/domain/course"
 	"educonnect-lms/backend/internal/domain/curriculum"
+	"educonnect-lms/backend/internal/domain/enrollment"
 	"educonnect-lms/backend/internal/domain/submission"
 	"educonnect-lms/backend/internal/domain/user"
 	"educonnect-lms/backend/internal/repository/postgres"
@@ -15,22 +16,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSubmissionRepository(t *testing.T) {
+func TestGradebookRepository_ForCourse(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
 
 	userRepo := postgres.NewUserRepository(pool)
-	teacher, _ := user.NewUser("gv4@vlu.edu.vn", "GV", user.RoleTeacher)
+	teacher, _ := user.NewUser("gv5@vlu.edu.vn", "GV", user.RoleTeacher)
 	require.NoError(t, teacher.SetPasswordHash("hash"))
 	require.NoError(t, userRepo.Create(ctx, teacher))
 
-	student, _ := user.NewUser("hv4@vlu.edu.vn", "Hoc Vien", user.RoleStudent)
+	student, _ := user.NewUser("hv5@vlu.edu.vn", "Hoc Vien Nam", user.RoleStudent)
 	require.NoError(t, student.SetPasswordHash("hash"))
 	require.NoError(t, userRepo.Create(ctx, student))
 
 	courseRepo := postgres.NewCourseRepository(pool)
 	c, _ := course.NewCourse("Golang", "desc", teacher.ID())
 	require.NoError(t, courseRepo.Create(ctx, c))
+
+	enrollRepo := postgres.NewEnrollmentRepository(pool)
+	e, _ := enrollment.NewEnrollment(student.ID(), c.ID())
+	require.NoError(t, enrollRepo.Create(ctx, e))
 
 	chapterRepo := postgres.NewChapterRepository(pool)
 	ch, _ := curriculum.NewChapter(c.ID(), "Chuong 1", 0)
@@ -47,37 +52,17 @@ func TestSubmissionRepository(t *testing.T) {
 	require.NoError(t, assignmentRepo.Create(ctx, quiz))
 
 	submissionRepo := postgres.NewSubmissionRepository(pool)
-
-	_, err := submissionRepo.FindByAssignmentAndStudent(ctx, quiz.ID(), student.ID())
-	assert.ErrorIs(t, err, submission.ErrNotFound)
-
-	s, err := submission.NewSubmission(quiz.ID(), student.ID(), "", []int{1})
-	require.NoError(t, err)
+	s, _ := submission.NewSubmission(quiz.ID(), student.ID(), "", []int{1})
+	require.NoError(t, s.Grade(10, ""))
 	require.NoError(t, submissionRepo.Create(ctx, s))
-	assert.NotZero(t, s.ID())
 
-	found, err := submissionRepo.FindByAssignmentAndStudent(ctx, quiz.ID(), student.ID())
+	gradebookRepo := postgres.NewGradebookRepository(pool)
+	entries, err := gradebookRepo.ForCourse(ctx, c.ID())
 	require.NoError(t, err)
-	assert.Equal(t, []int{1}, found.Answers())
-
-	list, err := submissionRepo.ListByAssignment(ctx, quiz.ID())
-	require.NoError(t, err)
-	require.Len(t, list, 1)
-
-	byID, err := submissionRepo.FindByID(ctx, s.ID())
-	require.NoError(t, err)
-	assert.False(t, byID.IsGraded())
-
-	require.NoError(t, byID.Grade(8.5, "Lam tot"))
-	require.NoError(t, submissionRepo.Update(ctx, byID))
-
-	regraded, err := submissionRepo.FindByID(ctx, s.ID())
-	require.NoError(t, err)
-	require.True(t, regraded.IsGraded())
-	assert.Equal(t, 8.5, *regraded.Score())
-	assert.Equal(t, "Lam tot", regraded.Feedback())
-	assert.NotNil(t, regraded.GradedAt())
-
-	_, err = submissionRepo.FindByID(ctx, 999999)
-	assert.ErrorIs(t, err, submission.ErrNotFound)
+	require.Len(t, entries, 1)
+	assert.Equal(t, student.ID(), entries[0].StudentID)
+	assert.Equal(t, "Hoc Vien Nam", entries[0].StudentName)
+	assert.Equal(t, quiz.ID(), entries[0].AssignmentID)
+	require.NotNil(t, entries[0].Score)
+	assert.Equal(t, 10.0, *entries[0].Score)
 }

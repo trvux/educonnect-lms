@@ -32,3 +32,22 @@ func TestNewSubmission_Validation(t *testing.T) {
 	_, err = submission.NewSubmission(1, 2, "", nil)
 	assert.ErrorIs(t, err, submission.ErrEmptySubmission)
 }
+
+func TestSubmission_Grade(t *testing.T) {
+	s, err := submission.NewSubmission(1, 2, "bai lam cua toi", nil)
+	require.NoError(t, err)
+	assert.False(t, s.IsGraded())
+
+	require.NoError(t, s.Grade(8.5, "Lam tot"))
+	assert.True(t, s.IsGraded())
+	require.NotNil(t, s.Score())
+	assert.Equal(t, 8.5, *s.Score())
+	assert.Equal(t, "Lam tot", s.Feedback())
+	assert.NotNil(t, s.GradedAt())
+
+	err = s.Grade(-1, "")
+	assert.ErrorIs(t, err, submission.ErrInvalidScore)
+
+	err = s.Grade(10.5, "")
+	assert.ErrorIs(t, err, submission.ErrInvalidScore)
+}

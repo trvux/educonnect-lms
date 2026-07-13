@@ -18,6 +18,7 @@ import (
 	courseservice "educonnect-lms/backend/internal/service/course"
 	curriculumservice "educonnect-lms/backend/internal/service/curriculum"
 	enrollmentservice "educonnect-lms/backend/internal/service/enrollment"
+	gradebookservice "educonnect-lms/backend/internal/service/gradebook"
 	materialservice "educonnect-lms/backend/internal/service/material"
 	submissionservice "educonnect-lms/backend/internal/service/submission"
 
@@ -52,6 +53,7 @@ func main() {
 	materialRepo := postgres.NewMaterialRepository(pool)
 	assignmentRepo := postgres.NewAssignmentRepository(pool)
 	submissionRepo := postgres.NewSubmissionRepository(pool)
+	gradebookRepo := postgres.NewGradebookRepository(pool)
 	hasher := security.NewBcryptHasher()
 	tokens := security.NewJWTIssuer(cfg.JWTSecret, 24*time.Hour)
 	fileStorage, err := storage.NewLocalFileStorage("uploads")
@@ -66,7 +68,8 @@ func main() {
 	enrollmentSvc := enrollmentservice.NewService(enrollmentRepo, courseRepo, userRepo)
 	materialSvc := materialservice.NewService(materialRepo, lessonRepo, fileStorage)
 	assignmentSvc := assignmentservice.NewService(assignmentRepo, lessonRepo)
-	submissionSvc := submissionservice.NewService(submissionRepo, assignmentSvc)
+	submissionSvc := submissionservice.NewService(submissionRepo, assignmentSvc, lessonRepo, chapterRepo, courseRepo)
+	gradebookSvc := gradebookservice.NewService(gradebookRepo)
 
 	// tầng HTTP
 	authHandler := handler.NewAuthHandler(authSvc, log)
@@ -76,6 +79,7 @@ func main() {
 	materialHandler := handler.NewMaterialHandler(materialSvc, log)
 	assignmentHandler := handler.NewAssignmentHandler(assignmentSvc, log)
 	submissionHandler := handler.NewSubmissionHandler(submissionSvc, log)
+	gradebookHandler := handler.NewGradebookHandler(gradebookSvc, courseSvc, log)
 
 	r := router.New(router.Deps{
 		AuthHandler:       authHandler,
@@ -85,6 +89,7 @@ func main() {
 		MaterialHandler:   materialHandler,
 		AssignmentHandler: assignmentHandler,
 		SubmissionHandler: submissionHandler,
+		GradebookHandler:  gradebookHandler,
 		TokenVerifier:     tokens,
 		UploadsDir:        "uploads",
 	})

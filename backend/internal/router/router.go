@@ -21,6 +21,7 @@ type Deps struct {
 	MaterialHandler   *handler.MaterialHandler
 	AssignmentHandler *handler.AssignmentHandler
 	SubmissionHandler *handler.SubmissionHandler
+	GradebookHandler  *handler.GradebookHandler
 	TokenVerifier     middleware.TokenVerifier
 	// UploadsDir là thư mục lưu file vật lý (US4.1), phục vụ tĩnh qua
 	// /uploads/* để frontend tải xuống (US4.2).
@@ -98,6 +99,10 @@ func New(deps Deps) http.Handler {
 				r.Post("/chapters/{chapterId}/lessons", deps.CurriculumHandler.CreateLesson) // US2.2
 				r.Post("/lessons/{id}/materials", deps.MaterialHandler.Upload)               // US4.1
 				r.Post("/lessons/{id}/assignments", deps.AssignmentHandler.Create)           // US5.1
+
+				r.Get("/assignments/{id}/submissions", deps.SubmissionHandler.ListByAssignment) // US5.3
+				r.Post("/submissions/{id}/grade", deps.SubmissionHandler.Grade)                 // US5.3
+				r.Get("/courses/{id}/gradebook", deps.GradebookHandler.ForCourse)               // US5.3
 			})
 
 			r.Route("/admin", func(r chi.Router) {
