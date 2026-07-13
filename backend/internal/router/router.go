@@ -24,6 +24,8 @@ type Deps struct {
 	GradebookHandler    *handler.GradebookHandler
 	ForumHandler        *handler.ForumHandler
 	NotificationHandler *handler.NotificationHandler
+	ProgressHandler     *handler.ProgressHandler
+	ReportHandler       *handler.ReportHandler
 	TokenVerifier       middleware.TokenVerifier
 	// UploadsDir là thư mục lưu file vật lý (US4.1), phục vụ tĩnh qua
 	// /uploads/* để frontend tải xuống (US4.2).
@@ -95,6 +97,7 @@ func New(deps Deps) http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireRole(user.RoleStudent))
 				r.Post("/assignments/{id}/submit", deps.SubmissionHandler.Submit) // US5.2
+				r.Get("/me/progress", deps.ProgressHandler.Me)                    // US7.1
 			})
 
 			r.Group(func(r chi.Router) {
@@ -113,6 +116,8 @@ func New(deps Deps) http.Handler {
 				r.Get("/courses/{id}/gradebook", deps.GradebookHandler.ForCourse)               // US5.3
 
 				r.Post("/courses/{id}/notifications", deps.NotificationHandler.SendToCourse) // US6.2
+
+				r.Get("/reports/courses", deps.ReportHandler.Courses) // US7.2
 			})
 
 			r.Route("/admin", func(r chi.Router) {

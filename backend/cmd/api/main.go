@@ -22,6 +22,8 @@ import (
 	gradebookservice "educonnect-lms/backend/internal/service/gradebook"
 	materialservice "educonnect-lms/backend/internal/service/material"
 	notificationservice "educonnect-lms/backend/internal/service/notification"
+	progressservice "educonnect-lms/backend/internal/service/progress"
+	reportservice "educonnect-lms/backend/internal/service/report"
 	submissionservice "educonnect-lms/backend/internal/service/submission"
 
 	"go.uber.org/zap"
@@ -58,6 +60,8 @@ func main() {
 	gradebookRepo := postgres.NewGradebookRepository(pool)
 	forumRepo := postgres.NewForumRepository(pool)
 	notificationRepo := postgres.NewNotificationRepository(pool)
+	progressRepo := postgres.NewProgressRepository(pool)
+	reportRepo := postgres.NewReportRepository(pool)
 	hasher := security.NewBcryptHasher()
 	tokens := security.NewJWTIssuer(cfg.JWTSecret, 24*time.Hour)
 	fileStorage, err := storage.NewLocalFileStorage("uploads")
@@ -76,6 +80,8 @@ func main() {
 	gradebookSvc := gradebookservice.NewService(gradebookRepo)
 	forumSvc := forumservice.NewService(forumRepo, courseRepo)
 	notificationSvc := notificationservice.NewService(notificationRepo, enrollmentRepo, courseRepo)
+	progressSvc := progressservice.NewService(progressRepo)
+	reportSvc := reportservice.NewService(reportRepo)
 
 	// tầng HTTP
 	authHandler := handler.NewAuthHandler(authSvc, log)
@@ -88,6 +94,8 @@ func main() {
 	gradebookHandler := handler.NewGradebookHandler(gradebookSvc, courseSvc, log)
 	forumHandler := handler.NewForumHandler(forumSvc, log)
 	notificationHandler := handler.NewNotificationHandler(notificationSvc, log)
+	progressHandler := handler.NewProgressHandler(progressSvc, log)
+	reportHandler := handler.NewReportHandler(reportSvc, log)
 
 	r := router.New(router.Deps{
 		AuthHandler:         authHandler,
@@ -100,6 +108,8 @@ func main() {
 		GradebookHandler:    gradebookHandler,
 		ForumHandler:        forumHandler,
 		NotificationHandler: notificationHandler,
+		ProgressHandler:     progressHandler,
+		ReportHandler:       reportHandler,
 		TokenVerifier:       tokens,
 		UploadsDir:          "uploads",
 	})
