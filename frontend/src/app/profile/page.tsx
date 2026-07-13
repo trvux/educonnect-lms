@@ -65,9 +65,16 @@ export default function ProfilePage() {
 
   const profileForm = useForm<ProfileValues>({
     resolver: zodResolver(profileSchema),
-    values: me
-      ? { fullName: me.full_name, phone: me.phone ?? "", studentCode: me.student_code ?? "" }
-      : undefined,
+    // Luôn truyền object đã định nghĩa đủ field (không phải undefined) — nếu
+    // không, lần render đầu tiên (trước khi `me` tải xong) sẽ khởi tạo field
+    // với value undefined (uncontrolled), rồi effect sync của react-hook-form
+    // set lại thành string thật ngay sau đó (controlled), gây cảnh báo
+    // Base UI "uncontrolled to controlled".
+    values: {
+      fullName: me?.full_name ?? "",
+      phone: me?.phone ?? "",
+      studentCode: me?.student_code ?? "",
+    },
   });
 
   const updateProfileMutation = useMutation({
