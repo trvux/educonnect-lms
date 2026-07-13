@@ -103,7 +103,7 @@ export default function CoursePlayerLayout({
           </SidebarContent>
         </Sidebar>
         <SidebarInset>
-          <div className="flex items-center gap-2 border-b p-2 md:hidden">
+          <div className="flex items-center gap-2 border-b p-2">
             <SidebarTrigger />
             <span className="text-sm font-medium">Nội dung khóa học</span>
           </div>
