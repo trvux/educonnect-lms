@@ -13,6 +13,7 @@ import (
 	"educonnect-lms/backend/internal/platform/storage"
 	"educonnect-lms/backend/internal/repository/postgres"
 	"educonnect-lms/backend/internal/router"
+	assignmentservice "educonnect-lms/backend/internal/service/assignment"
 	authservice "educonnect-lms/backend/internal/service/auth"
 	courseservice "educonnect-lms/backend/internal/service/course"
 	curriculumservice "educonnect-lms/backend/internal/service/curriculum"
@@ -48,6 +49,7 @@ func main() {
 	lessonRepo := postgres.NewLessonRepository(pool)
 	enrollmentRepo := postgres.NewEnrollmentRepository(pool)
 	materialRepo := postgres.NewMaterialRepository(pool)
+	assignmentRepo := postgres.NewAssignmentRepository(pool)
 	hasher := security.NewBcryptHasher()
 	tokens := security.NewJWTIssuer(cfg.JWTSecret, 24*time.Hour)
 	fileStorage, err := storage.NewLocalFileStorage("uploads")
@@ -61,6 +63,7 @@ func main() {
 	curriculumSvc := curriculumservice.NewService(chapterRepo, lessonRepo)
 	enrollmentSvc := enrollmentservice.NewService(enrollmentRepo, courseRepo, userRepo)
 	materialSvc := materialservice.NewService(materialRepo, lessonRepo, fileStorage)
+	assignmentSvc := assignmentservice.NewService(assignmentRepo, lessonRepo)
 
 	// tầng HTTP
 	authHandler := handler.NewAuthHandler(authSvc, log)
@@ -68,6 +71,7 @@ func main() {
 	curriculumHandler := handler.NewCurriculumHandler(curriculumSvc, log)
 	enrollmentHandler := handler.NewEnrollmentHandler(enrollmentSvc, log)
 	materialHandler := handler.NewMaterialHandler(materialSvc, log)
+	assignmentHandler := handler.NewAssignmentHandler(assignmentSvc, log)
 
 	r := router.New(router.Deps{
 		AuthHandler:       authHandler,
@@ -75,6 +79,7 @@ func main() {
 		CurriculumHandler: curriculumHandler,
 		EnrollmentHandler: enrollmentHandler,
 		MaterialHandler:   materialHandler,
+		AssignmentHandler: assignmentHandler,
 		TokenVerifier:     tokens,
 		UploadsDir:        "uploads",
 	})

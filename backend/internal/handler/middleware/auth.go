@@ -45,6 +45,25 @@ func RequireAuth(verifier TokenVerifier) func(http.Handler) http.Handler {
 	}
 }
 
+// OptionalAuth giải mã Bearer token nếu có nhưng không chặn request khi
+// thiếu/token không hợp lệ — dùng cho route public nhưng cần biết vai trò
+// người gọi để điều chỉnh response (vd ẩn đáp án đúng của trắc nghiệm với
+// học viên/khách, xem US5.1).
+func OptionalAuth(verifier TokenVerifier) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			header := r.Header.Get("Authorization")
+			token, ok := strings.CutPrefix(header, "Bearer ")
+			if ok && token != "" {
+				if claims, err := verifier.Verify(token); err == nil {
+					r = r.WithContext(context.WithValue(r.Context(), claimsCtxKey, claims))
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // RequireRole phải chạy sau RequireAuth. Đây là nơi hiện thực kiểm tra RBAC
 // kiểu US1.3 (vd chỉ teacher/admin mới được tạo khóa học).
 func RequireRole(allowed ...user.Role) func(http.Handler) http.Handler {
