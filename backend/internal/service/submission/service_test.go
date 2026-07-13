@@ -229,3 +229,19 @@ func TestService_Grade_ByAdmin_Allowed(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 9.0, *graded.Score())
 }
+
+func TestService_GetMine(t *testing.T) {
+	assignments, lessons, chapters, courses := newTestSetup(10, assignment.TypeEssay, nil)
+	submissions := &fakeSubmissionRepo{}
+	svc := submissionservice.NewService(submissions, assignments, lessons, chapters, courses)
+
+	_, err := svc.GetMine(context.Background(), 1, 2)
+	assert.ErrorIs(t, err, submission.ErrNotFound)
+
+	sub, err := svc.Submit(context.Background(), 1, 2, "bai lam", nil)
+	require.NoError(t, err)
+
+	mine, err := svc.GetMine(context.Background(), 1, 2)
+	require.NoError(t, err)
+	assert.Equal(t, sub.ID(), mine.ID())
+}

@@ -20,6 +20,7 @@ type SubmissionService interface {
 	Submit(ctx context.Context, assignmentID, studentID uint, content string, answers []int) (*submission.Submission, error)
 	Grade(ctx context.Context, submissionID, graderID uint, isAdmin bool, score float64, feedback string) (*submission.Submission, error)
 	ListByAssignment(ctx context.Context, assignmentID uint) ([]*submission.Submission, error)
+	GetMine(ctx context.Context, assignmentID, studentID uint) (*submission.Submission, error)
 }
 
 type SubmissionHandler struct {
@@ -141,6 +142,30 @@ func (h *SubmissionHandler) ListByAssignment(w http.ResponseWriter, r *http.Requ
 		out = append(out, toSubmissionResponse(s))
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// GetMine xử lý GET /api/assignments/{id}/my-submission (chỉ học viên đã
+// đăng nhập — trả về ErrNotFound nếu chưa nộp). Cho phép FE biết ngay
+// trạng thái đã nộp/điểm khi vào trang làm bài, không cần đợi bấm Nộp bài.
+func (h *SubmissionHandler) GetMine(w http.ResponseWriter, r *http.Request) {
+	assignmentID, err := parseUintParam(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "assignment id không hợp lệ")
+		return
+	}
+
+	claims, ok := middleware.ClaimsFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "thiếu thông tin xác thực")
+		return
+	}
+
+	s, err := h.service.GetMine(r.Context(), assignmentID, claims.UserID)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toSubmissionResponse(s))
 }
 
 func (h *SubmissionHandler) handleError(w http.ResponseWriter, err error) {

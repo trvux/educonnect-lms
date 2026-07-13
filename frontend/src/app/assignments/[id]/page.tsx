@@ -1,13 +1,12 @@
 "use client";
 
 import { use, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { getAssignment } from "@/lib/api/assignments";
-import { submitAssignment } from "@/lib/api/submissions";
+import { getMySubmission, submitAssignment } from "@/lib/api/submissions";
 import { useSession } from "@/lib/auth";
-import type { Submission } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,15 +20,23 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
   const { id } = use(params);
   const assignmentId = Number(id);
   const session = useSession();
+  const queryClient = useQueryClient();
+  const isStudent = session?.role === "student";
 
   const [content, setContent] = useState("");
   const [answers, setAnswers] = useState<Record<number, number>>({});
-  const [submitted, setSubmitted] = useState<Submission | null>(null);
-  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
 
   const { data: assignment, isLoading } = useQuery({
     queryKey: ["assignment", assignmentId],
     queryFn: () => getAssignment(assignmentId),
+  });
+
+  // US5.2 — biết ngay trạng thái đã nộp/điểm khi vào trang, không cần đợi
+  // bấm Nộp bài mới biết qua lỗi 409.
+  const { data: mySubmission, isLoading: isMySubmissionLoading } = useQuery({
+    queryKey: ["my-submission", assignmentId],
+    queryFn: () => getMySubmission(assignmentId),
+    enabled: isStudent,
   });
 
   const submitMutation = useMutation({
@@ -42,13 +49,13 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
     },
     onSuccess: (data) => {
       toast.success("Nộp bài thành công");
-      setSubmitted(data);
+      queryClient.setQueryData(["my-submission", assignmentId], data);
     },
     onError: (error: unknown) => {
       const status = (error as { response?: { status?: number } })?.response?.status;
       if (status === 409) {
         toast.info("Bạn đã nộp bài này rồi");
-        setAlreadySubmitted(true);
+        queryClient.invalidateQueries({ queryKey: ["my-submission", assignmentId] });
       } else if (status === 400) {
         toast.error("Đã quá hạn nộp hoặc dữ liệu không hợp lệ");
       } else {
@@ -74,7 +81,6 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
     );
   }
 
-  const isStudent = session?.role === "student";
   const canManage = session?.role === "teacher" || session?.role === "admin";
   const quizComplete =
     assignment.kind !== "quiz" || assignment.questions.every((_, i) => answers[i] !== undefined);
@@ -94,7 +100,9 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
         </p>
       )}
 
-      {isStudent && !submitted && !alreadySubmitted && (
+      {isStudent && isMySubmissionLoading && <Skeleton className="mt-6 h-32 w-full" />}
+
+      {isStudent && !isMySubmissionLoading && !mySubmission && (
         <Card className="mt-6">
           <CardHeader>
             <CardTitle className="text-base">Làm bài</CardTitle>
@@ -149,26 +157,18 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
         </Card>
       )}
 
-      {isStudent && alreadySubmitted && !submitted && (
-        <Card className="mt-6">
-          <CardContent className="pt-6 text-sm text-muted-foreground">
-            Bạn đã nộp bài tập này rồi.
-          </CardContent>
-        </Card>
-      )}
-
-      {isStudent && submitted && (
+      {isStudent && !isMySubmissionLoading && mySubmission && (
         <Card className="mt-6">
           <CardHeader>
             <CardTitle className="text-base">Đã nộp bài</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2 text-sm">
-            {submitted.graded ? (
+            {mySubmission.graded ? (
               <>
                 <p>
-                  Điểm: <span className="font-semibold">{submitted.score}</span> / 10
+                  Điểm: <span className="font-semibold">{mySubmission.score}</span> / 10
                 </p>
-                {submitted.feedback && <p>Nhận xét: {submitted.feedback}</p>}
+                {mySubmission.feedback && <p>Nhận xét: {mySubmission.feedback}</p>}
               </>
             ) : (
               <p className="text-muted-foreground">Bài làm đang chờ giảng viên chấm điểm.</p>

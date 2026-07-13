@@ -128,6 +128,13 @@ func (s *Service) ListByAssignment(ctx context.Context, assignmentID uint) ([]*s
 	return s.submissions.ListByAssignment(ctx, assignmentID)
 }
 
+// GetMine trả về bài nộp của chính học viên cho 1 Assignment (ErrNotFound
+// nếu chưa nộp) — để FE biết trạng thái đã nộp/điểm ngay khi vào trang làm
+// bài, thay vì đợi bấm Nộp bài mới biết qua lỗi 409.
+func (s *Service) GetMine(ctx context.Context, assignmentID, studentID uint) (*submission.Submission, error) {
+	return s.submissions.FindByAssignmentAndStudent(ctx, assignmentID, studentID)
+}
+
 func (s *Service) teacherOwnsSubmission(ctx context.Context, sub *submission.Submission, teacherID uint) (bool, error) {
 	a, err := s.assignments.Get(ctx, sub.AssignmentID())
 	if err != nil {

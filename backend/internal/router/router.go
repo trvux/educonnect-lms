@@ -96,8 +96,9 @@ func New(deps Deps) http.Handler {
 
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireRole(user.RoleStudent))
-				r.Post("/assignments/{id}/submit", deps.SubmissionHandler.Submit) // US5.2
-				r.Get("/me/progress", deps.ProgressHandler.Me)                    // US7.1
+				r.Post("/assignments/{id}/submit", deps.SubmissionHandler.Submit)        // US5.2
+				r.Get("/assignments/{id}/my-submission", deps.SubmissionHandler.GetMine) // US5.2
+				r.Get("/me/progress", deps.ProgressHandler.Me)                           // US7.1
 			})
 
 			r.Group(func(r chi.Router) {
