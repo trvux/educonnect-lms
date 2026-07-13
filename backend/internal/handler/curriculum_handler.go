@@ -21,10 +21,12 @@ type CurriculumService interface {
 	ListChapters(ctx context.Context, courseID uint) ([]*curriculum.Chapter, error)
 	RenameChapter(ctx context.Context, chapterID uint, title string, userID uint, role user.Role) (*curriculum.Chapter, error)
 	DeleteChapter(ctx context.Context, chapterID, userID uint, role user.Role) error
+	ReorderChapters(ctx context.Context, courseID uint, ids []uint, userID uint, role user.Role) ([]*curriculum.Chapter, error)
 	CreateLesson(ctx context.Context, chapterID uint, title string) (*curriculum.Lesson, error)
 	ListLessons(ctx context.Context, chapterID uint) ([]*curriculum.Lesson, error)
 	RenameLesson(ctx context.Context, lessonID uint, title string, userID uint, role user.Role) (*curriculum.Lesson, error)
 	DeleteLesson(ctx context.Context, lessonID, userID uint, role user.Role) error
+	ReorderLessons(ctx context.Context, chapterID uint, ids []uint, userID uint, role user.Role) ([]*curriculum.Lesson, error)
 }
 
 type CurriculumHandler struct {
@@ -38,6 +40,12 @@ func NewCurriculumHandler(service CurriculumService, log *zap.Logger) *Curriculu
 
 type titleRequest struct {
 	Title string `json:"title"`
+}
+
+// reorderRequest (US4.7): danh sách ID theo đúng thứ tự mới mong muốn sau
+// khi kéo-thả trên UI.
+type reorderRequest struct {
+	IDs []uint `json:"ids"`
 }
 
 type chapterResponse struct {
@@ -127,6 +135,36 @@ func (h *CurriculumHandler) DeleteChapter(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, nil)
 }
 
+// ReorderChapters xử lý PATCH /api/courses/{courseId}/chapters/reorder
+// (US4.7, chỉ GV sở hữu khóa học hoặc admin).
+func (h *CurriculumHandler) ReorderChapters(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.ClaimsFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "thiếu thông tin xác thực")
+		return
+	}
+	courseID, err := parseUintParam(r, "courseId")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "course id không hợp lệ")
+		return
+	}
+	var req reorderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "body JSON không hợp lệ")
+		return
+	}
+	chapters, err := h.service.ReorderChapters(r.Context(), courseID, req.IDs, claims.UserID, claims.Role)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+	out := make([]chapterResponse, 0, len(chapters))
+	for _, c := range chapters {
+		out = append(out, toChapterResponse(c))
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 // ListChapters xử lý GET /api/courses/{courseId}/chapters (public).
 func (h *CurriculumHandler) ListChapters(w http.ResponseWriter, r *http.Request) {
 	courseID, err := parseUintParam(r, "courseId")
@@ -210,6 +248,36 @@ func (h *CurriculumHandler) DeleteLesson(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, nil)
 }
 
+// ReorderLessons xử lý PATCH /api/chapters/{chapterId}/lessons/reorder
+// (US4.7).
+func (h *CurriculumHandler) ReorderLessons(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.ClaimsFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "thiếu thông tin xác thực")
+		return
+	}
+	chapterID, err := parseUintParam(r, "chapterId")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "chapter id không hợp lệ")
+		return
+	}
+	var req reorderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "body JSON không hợp lệ")
+		return
+	}
+	lessons, err := h.service.ReorderLessons(r.Context(), chapterID, req.IDs, claims.UserID, claims.Role)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+	out := make([]lessonResponse, 0, len(lessons))
+	for _, l := range lessons {
+		out = append(out, toLessonResponse(l))
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 // ListLessons xử lý GET /api/chapters/{chapterId}/lessons (public).
 func (h *CurriculumHandler) ListLessons(w http.ResponseWriter, r *http.Request) {
 	chapterID, err := parseUintParam(r, "chapterId")
@@ -240,7 +308,8 @@ func (h *CurriculumHandler) handleError(w http.ResponseWriter, err error) {
 	case errors.Is(err, curriculum.ErrChapterNotEmpty), errors.Is(err, curriculum.ErrLessonNotEmpty):
 		writeError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, curriculum.ErrEmptyChapterTitle), errors.Is(err, curriculum.ErrEmptyLessonTitle),
-		errors.Is(err, curriculum.ErrInvalidCourseID), errors.Is(err, curriculum.ErrInvalidChapterID):
+		errors.Is(err, curriculum.ErrInvalidCourseID), errors.Is(err, curriculum.ErrInvalidChapterID),
+		errors.Is(err, curriculum.ErrInvalidChapterOrder), errors.Is(err, curriculum.ErrInvalidLessonOrder):
 		writeError(w, http.StatusBadRequest, err.Error())
 	default:
 		h.log.Error("curriculum handler: lỗi không xác định", zap.Error(err))

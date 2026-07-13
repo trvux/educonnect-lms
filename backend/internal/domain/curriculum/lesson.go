@@ -11,6 +11,9 @@ var (
 	ErrInvalidChapterID = errors.New("lesson: chapter id là bắt buộc")
 	ErrLessonNotFound   = errors.New("lesson: không tìm thấy")
 	ErrLessonNotEmpty   = errors.New("lesson: còn tài liệu hoặc bài tập bên trong, xóa hết trước")
+	// ErrInvalidLessonOrder (US4.7): tương tự ErrInvalidChapterOrder, nhưng
+	// cho danh sách bài học trong 1 chương.
+	ErrInvalidLessonOrder = errors.New("lesson: danh sách thứ tự không khớp với các bài học hiện có")
 )
 
 // Lesson là 1 bài học nằm trong 1 Chapter (US2.2). Tài liệu bài giảng

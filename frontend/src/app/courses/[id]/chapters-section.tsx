@@ -3,17 +3,34 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { DownloadIcon, PencilIcon, PlusIcon, TrashIcon, UploadIcon } from "@phosphor-icons/react";
+import { DotsSixVerticalIcon, DownloadIcon, PencilIcon, PlusIcon, TrashIcon, UploadIcon } from "@phosphor-icons/react";
+import {
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 import {
   listChapters,
   createChapter,
   renameChapter,
   deleteChapter,
+  reorderChapters,
   listLessons,
   createLesson,
   renameLesson,
   deleteLesson,
+  reorderLessons,
 } from "@/lib/api/curriculum";
 import {
   listMaterials,
@@ -122,6 +139,31 @@ export function ChaptersSection({ courseId, canManage }: { courseId: number; can
     },
   });
 
+  // US4.7 — cập nhật thứ tự ngay trên cache (optimistic) để kéo-thả mượt,
+  // không phải chờ round-trip API mới thấy vị trí mới; rollback bằng
+  // invalidateQueries nếu server từ chối (ví dụ danh sách bị thay đổi ở tab
+  // khác trước khi kịp lưu).
+  const reorderChaptersMutation = useMutation({
+    mutationFn: (ids: number[]) => reorderChapters(courseId, ids),
+    onError: () => {
+      toast.error("Sắp xếp lại chương thất bại, đang tải lại danh sách");
+      queryClient.invalidateQueries({ queryKey: ["chapters", courseId] });
+    },
+  });
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+
+  function handleChapterDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!chapters || !over || active.id === over.id) return;
+    const oldIndex = chapters.findIndex((c) => c.id === active.id);
+    const newIndex = chapters.findIndex((c) => c.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(chapters, oldIndex, newIndex);
+    queryClient.setQueryData(["chapters", courseId], reordered);
+    reorderChaptersMutation.mutate(reordered.map((c) => c.id));
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between">
@@ -159,43 +201,24 @@ export function ChaptersSection({ courseId, canManage }: { courseId: number; can
         <p className="mt-4 text-sm text-muted-foreground">Chưa có chương nào.</p>
       )}
 
-      <Accordion multiple className="mt-2">
-        {chapters?.map((chapter) => (
-          <AccordionItem key={chapter.id} value={String(chapter.id)}>
-            <div className="flex items-center">
-              <AccordionTrigger className="flex-1">{chapter.title}</AccordionTrigger>
-              {canManage && (
-                <div className="flex items-center gap-1 pr-2">
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label="Đổi tên chương"
-                    onClick={() => {
-                      setRenameTarget(chapter);
-                      setRenameTitle(chapter.title);
-                    }}
-                  >
-                    <PencilIcon className="size-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label="Xóa chương"
-                    onClick={() => setDeleteTarget(chapter)}
-                  >
-                    <TrashIcon className="size-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
-            <AccordionContent>
-              <LessonsSection chapterId={chapter.id} canManage={canManage} />
-            </AccordionContent>
-          </AccordionItem>
-        ))}
-      </Accordion>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleChapterDragEnd}>
+        <SortableContext items={chapters?.map((c) => c.id) ?? []} strategy={verticalListSortingStrategy}>
+          <Accordion multiple className="mt-2">
+            {chapters?.map((chapter) => (
+              <SortableChapterItem
+                key={chapter.id}
+                chapter={chapter}
+                canManage={canManage}
+                onRename={(c) => {
+                  setRenameTarget(c);
+                  setRenameTitle(c.title);
+                }}
+                onDelete={setDeleteTarget}
+              />
+            ))}
+          </Accordion>
+        </SortableContext>
+      </DndContext>
 
       <Dialog
         open={renameTarget !== null}
@@ -237,6 +260,76 @@ export function ChaptersSection({ courseId, canManage }: { courseId: number; can
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+// US4.7 — bọc AccordionItem để gắn ref/style của dnd-kit (không bọc thêm
+// div ngoài AccordionItem: className "not-last:border-b" của AccordionItem
+// dựa vào vị trí sibling thật trong Accordion để vẽ đường phân cách giữa
+// các chương, bọc thêm div sẽ làm mỗi AccordionItem luôn là "last child"
+// của div riêng nó, mất hẳn đường phân cách).
+function SortableChapterItem({
+  chapter,
+  canManage,
+  onRename,
+  onDelete,
+}: {
+  chapter: Chapter;
+  canManage: boolean;
+  onRename: (chapter: Chapter) => void;
+  onDelete: (chapter: Chapter) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: chapter.id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : undefined,
+  };
+
+  return (
+    <AccordionItem ref={setNodeRef} style={style} value={String(chapter.id)}>
+      <div className="flex items-center">
+        {canManage && (
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            className="cursor-grab touch-none px-1 text-muted-foreground active:cursor-grabbing"
+            aria-label="Kéo để sắp xếp lại thứ tự chương"
+          >
+            <DotsSixVerticalIcon className="size-4" />
+          </button>
+        )}
+        <AccordionTrigger className="flex-1">{chapter.title}</AccordionTrigger>
+        {canManage && (
+          <div className="flex items-center gap-1 pr-2">
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Đổi tên chương"
+              onClick={() => onRename(chapter)}
+            >
+              <PencilIcon className="size-4" />
+            </Button>
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Xóa chương"
+              onClick={() => onDelete(chapter)}
+            >
+              <TrashIcon className="size-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+      <AccordionContent>
+        <LessonsSection chapterId={chapter.id} canManage={canManage} />
+      </AccordionContent>
+    </AccordionItem>
   );
 }
 
@@ -290,6 +383,28 @@ function LessonsSection({ chapterId, canManage }: { chapterId: number; canManage
     },
   });
 
+  // US4.7 — cùng pattern optimistic reorder như ChaptersSection.
+  const reorderLessonsMutation = useMutation({
+    mutationFn: (ids: number[]) => reorderLessons(chapterId, ids),
+    onError: () => {
+      toast.error("Sắp xếp lại bài học thất bại, đang tải lại danh sách");
+      queryClient.invalidateQueries({ queryKey: ["lessons", chapterId] });
+    },
+  });
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+
+  function handleLessonDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!lessons || !over || active.id === over.id) return;
+    const oldIndex = lessons.findIndex((l) => l.id === active.id);
+    const newIndex = lessons.findIndex((l) => l.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(lessons, oldIndex, newIndex);
+    queryClient.setQueryData(["lessons", chapterId], reordered);
+    reorderLessonsMutation.mutate(reordered.map((l) => l.id));
+  }
+
   return (
     <div className="flex flex-col gap-3 pl-1">
       {isLoading && <p className="text-sm text-muted-foreground">Đang tải bài học...</p>}
@@ -297,40 +412,22 @@ function LessonsSection({ chapterId, canManage }: { chapterId: number; canManage
         <p className="text-sm text-muted-foreground">Chưa có bài học nào trong chương này.</p>
       )}
 
-      {lessons?.map((lesson) => (
-        <div key={lesson.id} className="rounded-md border p-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="font-medium">{lesson.title}</p>
-            {canManage && (
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  size="icon-sm"
-                  variant="ghost"
-                  aria-label="Đổi tên bài học"
-                  onClick={() => {
-                    setRenameTarget(lesson);
-                    setRenameTitle(lesson.title);
-                  }}
-                >
-                  <PencilIcon className="size-4" />
-                </Button>
-                <Button
-                  type="button"
-                  size="icon-sm"
-                  variant="ghost"
-                  aria-label="Xóa bài học"
-                  onClick={() => setDeleteTarget(lesson)}
-                >
-                  <TrashIcon className="size-4" />
-                </Button>
-              </div>
-            )}
-          </div>
-          <MaterialsList lessonId={lesson.id} canManage={canManage} />
-          <AssignmentsSection lessonId={lesson.id} canManage={canManage} />
-        </div>
-      ))}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleLessonDragEnd}>
+        <SortableContext items={lessons?.map((l) => l.id) ?? []} strategy={verticalListSortingStrategy}>
+          {lessons?.map((lesson) => (
+            <SortableLessonItem
+              key={lesson.id}
+              lesson={lesson}
+              canManage={canManage}
+              onRename={(l) => {
+                setRenameTarget(l);
+                setRenameTitle(l.title);
+              }}
+              onDelete={setDeleteTarget}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
 
       {canManage && (
         <Dialog open={lessonDialogOpen} onOpenChange={setLessonDialogOpen}>
@@ -398,6 +495,74 @@ function LessonsSection({ chapterId, canManage }: { chapterId: number; canManage
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+// US4.7 — mỗi bài học là 1 div độc lập (không có ràng buộc sibling-CSS như
+// AccordionItem) nên bọc thêm div ngoài để gắn ref/style dnd-kit là an toàn.
+function SortableLessonItem({
+  lesson,
+  canManage,
+  onRename,
+  onDelete,
+}: {
+  lesson: Lesson;
+  canManage: boolean;
+  onRename: (lesson: Lesson) => void;
+  onDelete: (lesson: Lesson) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: lesson.id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="rounded-md border p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1">
+          {canManage && (
+            <button
+              type="button"
+              {...attributes}
+              {...listeners}
+              className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+              aria-label="Kéo để sắp xếp lại thứ tự bài học"
+            >
+              <DotsSixVerticalIcon className="size-4" />
+            </button>
+          )}
+          <p className="truncate font-medium">{lesson.title}</p>
+        </div>
+        {canManage && (
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Đổi tên bài học"
+              onClick={() => onRename(lesson)}
+            >
+              <PencilIcon className="size-4" />
+            </Button>
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Xóa bài học"
+              onClick={() => onDelete(lesson)}
+            >
+              <TrashIcon className="size-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+      <MaterialsList lessonId={lesson.id} canManage={canManage} />
+      <AssignmentsSection lessonId={lesson.id} canManage={canManage} />
     </div>
   );
 }

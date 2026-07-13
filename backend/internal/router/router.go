@@ -137,15 +137,17 @@ func New(deps Deps) http.Handler {
 				r.Post("/courses/{id}/submit", deps.CourseHandler.SubmitForReview)
 				r.Get("/courses/{id}/students", deps.EnrollmentHandler.ListStudents) // US3.3
 
-				r.Post("/courses/{courseId}/chapters", deps.CurriculumHandler.CreateChapter) // US2.2
-				r.Patch("/chapters/{id}", deps.CurriculumHandler.RenameChapter)              // US4.6
-				r.Delete("/chapters/{id}", deps.CurriculumHandler.DeleteChapter)             // US4.6
-				r.Post("/chapters/{chapterId}/lessons", deps.CurriculumHandler.CreateLesson) // US2.2
-				r.Patch("/lessons/{id}", deps.CurriculumHandler.RenameLesson)                // US4.6
-				r.Delete("/lessons/{id}", deps.CurriculumHandler.DeleteLesson)               // US4.6
-				r.Post("/lessons/{id}/materials", deps.MaterialHandler.Upload)               // US4.1
-				r.Delete("/materials/{id}", deps.MaterialHandler.Delete)                     // US4.8
-				r.Post("/lessons/{id}/assignments", deps.AssignmentHandler.Create)           // US5.1
+				r.Post("/courses/{courseId}/chapters", deps.CurriculumHandler.CreateChapter)            // US2.2
+				r.Patch("/chapters/{id}", deps.CurriculumHandler.RenameChapter)                         // US4.6
+				r.Delete("/chapters/{id}", deps.CurriculumHandler.DeleteChapter)                        // US4.6
+				r.Patch("/courses/{courseId}/chapters/reorder", deps.CurriculumHandler.ReorderChapters) // US4.7
+				r.Post("/chapters/{chapterId}/lessons", deps.CurriculumHandler.CreateLesson)            // US2.2
+				r.Patch("/lessons/{id}", deps.CurriculumHandler.RenameLesson)                           // US4.6
+				r.Delete("/lessons/{id}", deps.CurriculumHandler.DeleteLesson)                          // US4.6
+				r.Patch("/chapters/{chapterId}/lessons/reorder", deps.CurriculumHandler.ReorderLessons) // US4.7
+				r.Post("/lessons/{id}/materials", deps.MaterialHandler.Upload)                          // US4.1
+				r.Delete("/materials/{id}", deps.MaterialHandler.Delete)                                // US4.8
+				r.Post("/lessons/{id}/assignments", deps.AssignmentHandler.Create)                      // US5.1
 
 				r.Get("/assignments/{id}/submissions", deps.SubmissionHandler.ListByAssignment) // US5.3
 				r.Post("/submissions/{id}/grade", deps.SubmissionHandler.Grade)                 // US5.3

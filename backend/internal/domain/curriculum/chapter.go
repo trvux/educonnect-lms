@@ -13,6 +13,9 @@ var (
 	ErrInvalidCourseID   = errors.New("chapter: course id là bắt buộc")
 	ErrChapterNotFound   = errors.New("chapter: không tìm thấy")
 	ErrChapterNotEmpty   = errors.New("chapter: còn bài học bên trong, xóa hết bài học trước")
+	// ErrInvalidChapterOrder (US4.7): danh sách id gửi lên để sắp xếp lại
+	// không khớp (thiếu/thừa/lặp) với tập chương hiện có của khóa học.
+	ErrInvalidChapterOrder = errors.New("chapter: danh sách thứ tự không khớp với các chương hiện có")
 )
 
 // Chapter là 1 chương trong khóa học, có thứ tự hiển thị (Position) để

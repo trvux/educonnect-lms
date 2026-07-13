@@ -2,6 +2,7 @@ package curriculum_test
 
 import (
 	"context"
+	"sort"
 	"testing"
 
 	"educonnect-lms/backend/internal/domain/course"
@@ -41,6 +42,8 @@ func (r *fakeChapterRepo) ListByCourse(_ context.Context, courseID uint) ([]*cur
 			out = append(out, c)
 		}
 	}
+	// Postgres thật có ORDER BY position ASC (US4.7 cần đúng thứ tự này).
+	sort.Slice(out, func(i, j int) bool { return out[i].Position() < out[j].Position() })
 	return out, nil
 }
 func (r *fakeChapterRepo) CountByCourse(_ context.Context, courseID uint) (int, error) {
@@ -90,6 +93,7 @@ func (r *fakeLessonRepo) ListByChapter(_ context.Context, chapterID uint) ([]*cu
 			out = append(out, l)
 		}
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Position() < out[j].Position() })
 	return out, nil
 }
 func (r *fakeLessonRepo) CountByChapter(_ context.Context, chapterID uint) (int, error) {
@@ -225,4 +229,107 @@ func TestService_DeleteLesson_OwnershipCheck(t *testing.T) {
 
 	err = s.DeleteLesson(ctx, lessonID, 1, user.RoleTeacher)
 	assert.NoError(t, err)
+}
+
+// setupReorderFixture (US4.7) dựng course(teacherID=1) với 3 chương, mỗi
+// chương có 2 bài học, để test sắp xếp lại thứ tự.
+func setupReorderFixture(t *testing.T) (s *curriculumservice.Service, courseID uint, chapterIDs []uint, lessonIDs []uint) {
+	t.Helper()
+	c, err := course.NewCourse("Golang", "desc", 1)
+	require.NoError(t, err)
+	c.SetID(20)
+
+	courses := newFakeCourseGetter()
+	courses.byID[c.ID()] = c
+
+	chapters := newFakeChapterRepo()
+	lessons := newFakeLessonRepo()
+	s = curriculumservice.NewService(chapters, lessons, courses)
+	ctx := context.Background()
+
+	for i := 0; i < 3; i++ {
+		ch, err := s.CreateChapter(ctx, c.ID(), "Chuong")
+		require.NoError(t, err)
+		chapterIDs = append(chapterIDs, ch.ID())
+	}
+	for i := 0; i < 2; i++ {
+		l, err := s.CreateLesson(ctx, chapterIDs[0], "Bai")
+		require.NoError(t, err)
+		lessonIDs = append(lessonIDs, l.ID())
+	}
+	return s, c.ID(), chapterIDs, lessonIDs
+}
+
+func TestService_ReorderChapters(t *testing.T) {
+	s, courseID, chapterIDs, _ := setupReorderFixture(t)
+	ctx := context.Background()
+
+	// Đảo ngược thứ tự 3 chương.
+	newOrder := []uint{chapterIDs[2], chapterIDs[1], chapterIDs[0]}
+	reordered, err := s.ReorderChapters(ctx, courseID, newOrder, 1, user.RoleTeacher)
+	require.NoError(t, err)
+	require.Len(t, reordered, 3)
+	for i, ch := range reordered {
+		assert.Equal(t, newOrder[i], ch.ID())
+		assert.Equal(t, i, ch.Position())
+	}
+
+	chapters, err := s.ListChapters(ctx, courseID)
+	require.NoError(t, err)
+	assert.Equal(t, chapterIDs[2], chapters[0].ID(), "chương đứng đầu sau khi sắp xếp lại phải đúng thứ tự mới")
+}
+
+func TestService_ReorderChapters_InvalidIDList(t *testing.T) {
+	s, courseID, chapterIDs, _ := setupReorderFixture(t)
+	ctx := context.Background()
+
+	_, err := s.ReorderChapters(ctx, courseID, chapterIDs[:2], 1, user.RoleTeacher)
+	assert.ErrorIs(t, err, curriculum.ErrInvalidChapterOrder, "thiếu 1 id phải bị từ chối")
+
+	_, err = s.ReorderChapters(ctx, courseID, []uint{chapterIDs[0], chapterIDs[1], 9999}, 1, user.RoleTeacher)
+	assert.ErrorIs(t, err, curriculum.ErrInvalidChapterOrder, "id không tồn tại phải bị từ chối")
+
+	_, err = s.ReorderChapters(ctx, courseID, []uint{chapterIDs[0], chapterIDs[0], chapterIDs[1]}, 1, user.RoleTeacher)
+	assert.ErrorIs(t, err, curriculum.ErrInvalidChapterOrder, "id lặp lại phải bị từ chối")
+}
+
+func TestService_ReorderChapters_OwnershipCheck(t *testing.T) {
+	s, courseID, chapterIDs, _ := setupReorderFixture(t)
+	ctx := context.Background()
+
+	_, err := s.ReorderChapters(ctx, courseID, chapterIDs, 999, user.RoleTeacher)
+	assert.ErrorIs(t, err, curriculum.ErrChapterNotFound, "giảng viên khác không được sắp xếp lại")
+
+	_, err = s.ReorderChapters(ctx, courseID, chapterIDs, 999, user.RoleAdmin)
+	assert.NoError(t, err, "admin luôn được phép")
+}
+
+func TestService_ReorderLessons(t *testing.T) {
+	s, _, chapterIDs, lessonIDs := setupReorderFixture(t)
+	ctx := context.Background()
+
+	newOrder := []uint{lessonIDs[1], lessonIDs[0]}
+	reordered, err := s.ReorderLessons(ctx, chapterIDs[0], newOrder, 1, user.RoleTeacher)
+	require.NoError(t, err)
+	require.Len(t, reordered, 2)
+	assert.Equal(t, lessonIDs[1], reordered[0].ID())
+	assert.Equal(t, 0, reordered[0].Position())
+	assert.Equal(t, lessonIDs[0], reordered[1].ID())
+	assert.Equal(t, 1, reordered[1].Position())
+}
+
+func TestService_ReorderLessons_InvalidIDList(t *testing.T) {
+	s, _, chapterIDs, lessonIDs := setupReorderFixture(t)
+	ctx := context.Background()
+
+	_, err := s.ReorderLessons(ctx, chapterIDs[0], lessonIDs[:1], 1, user.RoleTeacher)
+	assert.ErrorIs(t, err, curriculum.ErrInvalidLessonOrder)
+}
+
+func TestService_ReorderLessons_OwnershipCheck(t *testing.T) {
+	s, _, chapterIDs, lessonIDs := setupReorderFixture(t)
+	ctx := context.Background()
+
+	_, err := s.ReorderLessons(ctx, chapterIDs[0], lessonIDs, 999, user.RoleTeacher)
+	assert.ErrorIs(t, err, curriculum.ErrLessonNotFound)
 }

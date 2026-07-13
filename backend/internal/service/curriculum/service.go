@@ -152,6 +152,98 @@ func (s *Service) DeleteLesson(ctx context.Context, lessonID, userID uint, role 
 	return s.lessons.Delete(ctx, lessonID)
 }
 
+// ReorderChapters hiện thực US4.7: giảng viên kéo-thả sắp xếp lại thứ tự
+// chương trong khóa học. ids phải là hoán vị đầy đủ của toàn bộ ID chương
+// hiện có của khóa học (không thiếu/thừa/lặp) — thứ tự xuất hiện trong ids
+// quyết định Position mới (0, 1, 2, ...).
+func (s *Service) ReorderChapters(ctx context.Context, courseID uint, ids []uint, userID uint, role user.Role) ([]*curriculum.Chapter, error) {
+	owns, err := s.ownsCourse(ctx, courseID, userID, role)
+	if err != nil {
+		return nil, err
+	}
+	if !owns {
+		return nil, curriculum.ErrChapterNotFound
+	}
+	existing, err := s.chapters.ListByCourse(ctx, courseID)
+	if err != nil {
+		return nil, err
+	}
+	if len(ids) != len(existing) {
+		return nil, curriculum.ErrInvalidChapterOrder
+	}
+	byID := make(map[uint]*curriculum.Chapter, len(existing))
+	for _, ch := range existing {
+		byID[ch.ID()] = ch
+	}
+	ordered := make([]*curriculum.Chapter, 0, len(ids))
+	seen := make(map[uint]bool, len(ids))
+	for _, id := range ids {
+		if seen[id] {
+			return nil, curriculum.ErrInvalidChapterOrder
+		}
+		ch, ok := byID[id]
+		if !ok {
+			return nil, curriculum.ErrInvalidChapterOrder
+		}
+		seen[id] = true
+		ordered = append(ordered, ch)
+	}
+	for i, ch := range ordered {
+		ch.Reorder(i)
+		if err := s.chapters.Update(ctx, ch); err != nil {
+			return nil, err
+		}
+	}
+	return ordered, nil
+}
+
+// ReorderLessons hiện thực US4.7, cùng logic như ReorderChapters nhưng cho
+// bài học trong 1 chương.
+func (s *Service) ReorderLessons(ctx context.Context, chapterID uint, ids []uint, userID uint, role user.Role) ([]*curriculum.Lesson, error) {
+	ch, err := s.chapters.FindByID(ctx, chapterID)
+	if err != nil {
+		return nil, err
+	}
+	owns, err := s.ownsCourse(ctx, ch.CourseID(), userID, role)
+	if err != nil {
+		return nil, err
+	}
+	if !owns {
+		return nil, curriculum.ErrLessonNotFound
+	}
+	existing, err := s.lessons.ListByChapter(ctx, chapterID)
+	if err != nil {
+		return nil, err
+	}
+	if len(ids) != len(existing) {
+		return nil, curriculum.ErrInvalidLessonOrder
+	}
+	byID := make(map[uint]*curriculum.Lesson, len(existing))
+	for _, l := range existing {
+		byID[l.ID()] = l
+	}
+	ordered := make([]*curriculum.Lesson, 0, len(ids))
+	seen := make(map[uint]bool, len(ids))
+	for _, id := range ids {
+		if seen[id] {
+			return nil, curriculum.ErrInvalidLessonOrder
+		}
+		l, ok := byID[id]
+		if !ok {
+			return nil, curriculum.ErrInvalidLessonOrder
+		}
+		seen[id] = true
+		ordered = append(ordered, l)
+	}
+	for i, l := range ordered {
+		l.Reorder(i)
+		if err := s.lessons.Update(ctx, l); err != nil {
+			return nil, err
+		}
+	}
+	return ordered, nil
+}
+
 func (s *Service) ownsLesson(ctx context.Context, l *curriculum.Lesson, userID uint, role user.Role) (bool, error) {
 	ch, err := s.chapters.FindByID(ctx, l.ChapterID())
 	if err != nil {
