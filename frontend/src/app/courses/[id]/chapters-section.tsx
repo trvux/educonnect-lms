@@ -19,6 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { restrictToParentElement, restrictToVerticalAxis } from "@dnd-kit/modifiers";
 
 import {
   listChapters,
@@ -201,7 +202,12 @@ export function ChaptersSection({ courseId, canManage }: { courseId: number; can
         <p className="mt-4 text-sm text-muted-foreground">Chưa có chương nào.</p>
       )}
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleChapterDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleChapterDragEnd}
+        modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+      >
         <SortableContext items={chapters?.map((c) => c.id) ?? []} strategy={verticalListSortingStrategy}>
           <Accordion multiple className="mt-2">
             {chapters?.map((chapter) => (
@@ -412,7 +418,12 @@ function LessonsSection({ chapterId, canManage }: { chapterId: number; canManage
         <p className="text-sm text-muted-foreground">Chưa có bài học nào trong chương này.</p>
       )}
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleLessonDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleLessonDragEnd}
+        modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+      >
         <SortableContext items={lessons?.map((l) => l.id) ?? []} strategy={verticalListSortingStrategy}>
           {lessons?.map((lesson) => (
             <SortableLessonItem
