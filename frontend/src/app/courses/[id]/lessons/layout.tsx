@@ -50,12 +50,15 @@ export default function CoursePlayerLayout({
   });
 
   return (
-    // "transform": Sidebar dùng position: fixed (inset-y-0) vì mặc định tự
-    // coi nó là layout ngoài cùng — nhưng app này đã có Navbar ở RootLayout
-    // phía trên, nên fixed sẽ đè lên Navbar (định vị theo viewport, không
-    // theo layout cha). Thêm "transform" (dù không đổi gì) tạo containing
-    // block CSS, khiến Sidebar định vị theo div này thay vì viewport.
-    <div className="relative transform">
+    // Sidebar dùng position: fixed (inset-y-0) vì mặc định tự coi nó là
+    // layout ngoài cùng — nhưng app này đã có Navbar ở RootLayout phía
+    // trên, nên fixed sẽ đè lên Navbar (định vị theo viewport, không theo
+    // layout cha). Dùng inline style transform (không phải class Tailwind
+    // "transform" — ở Tailwind v4 class đó không tự sinh CSS transform
+    // thật, nên không tạo containing block, đã thử và không ăn) để chắc
+    // chắn có 1 giá trị transform thật, khiến Sidebar định vị theo div này
+    // thay vì viewport.
+    <div className="relative" style={{ transform: "translateZ(0)" }}>
       {/* min-h-0: bỏ min-h-svh mặc định của SidebarProvider vì đã có
           containing block riêng ở trên, không cần ép full viewport height. */}
       <SidebarProvider className="min-h-0 flex-1">
