@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -58,29 +59,31 @@ export function NotificationBell() {
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80">
-        <DropdownMenuLabel>Thông báo</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {!notifications || notifications.length === 0 ? (
-          <p className="px-2 py-4 text-center text-sm text-muted-foreground">
-            Không có thông báo nào.
-          </p>
-        ) : (
-          notifications.map((n) => (
-            <DropdownMenuItem
-              key={n.id}
-              className="flex flex-col items-start gap-0.5 whitespace-normal"
-              onClick={() => {
-                if (!n.read) markReadMutation.mutate(n.id);
-              }}
-            >
-              <div className="flex w-full items-center justify-between gap-2">
-                <span className="font-medium">{n.title}</span>
-                {!n.read && <span className="size-2 shrink-0 rounded-full bg-primary" />}
-              </div>
-              {n.message && <span className="text-xs text-muted-foreground">{n.message}</span>}
-            </DropdownMenuItem>
-          ))
-        )}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Thông báo</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {!notifications || notifications.length === 0 ? (
+            <p className="px-2 py-4 text-center text-sm text-muted-foreground">
+              Không có thông báo nào.
+            </p>
+          ) : (
+            notifications.map((n) => (
+              <DropdownMenuItem
+                key={n.id}
+                className="flex flex-col items-start gap-0.5 whitespace-normal"
+                onClick={() => {
+                  if (!n.read) markReadMutation.mutate(n.id);
+                }}
+              >
+                <div className="flex w-full items-center justify-between gap-2">
+                  <span className="font-medium">{n.title}</span>
+                  {!n.read && <span className="size-2 shrink-0 rounded-full bg-primary" />}
+                </div>
+                {n.message && <span className="text-xs text-muted-foreground">{n.message}</span>}
+              </DropdownMenuItem>
+            ))
+          )}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
