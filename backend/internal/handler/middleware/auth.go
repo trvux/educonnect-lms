@@ -64,6 +64,31 @@ func OptionalAuth(verifier TokenVerifier) func(http.Handler) http.Handler {
 	}
 }
 
+// RequireStreamAuth xác thực token đọc từ query param "token" thay vì
+// header Authorization (US4.5): thẻ <video src="..."> của trình duyệt không
+// gửi được custom header, nên endpoint stream video dùng token ngắn hạn
+// riêng (khác JWT đăng nhập dài hạn) truyền qua URL.
+func RequireStreamAuth(verifier TokenVerifier) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			token := r.URL.Query().Get("token")
+			if token == "" {
+				http.Error(w, `{"error":"thiếu token"}`, http.StatusUnauthorized)
+				return
+			}
+
+			claims, err := verifier.Verify(token)
+			if err != nil {
+				http.Error(w, `{"error":"token không hợp lệ hoặc đã hết hạn"}`, http.StatusUnauthorized)
+				return
+			}
+
+			ctx := context.WithValue(r.Context(), claimsCtxKey, claims)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
 // RequireRole phải chạy sau RequireAuth. Đây là nơi hiện thực kiểm tra RBAC
 // kiểu US1.3 (vd chỉ teacher/admin mới được tạo khóa học).
 func RequireRole(allowed ...user.Role) func(http.Handler) http.Handler {

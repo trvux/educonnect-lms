@@ -15,7 +15,13 @@ import {
   renameLesson,
   deleteLesson,
 } from "@/lib/api/curriculum";
-import { listMaterials, uploadMaterial, downloadMaterial, deleteMaterial } from "@/lib/api/materials";
+import {
+  listMaterials,
+  uploadMaterial,
+  downloadMaterial,
+  deleteMaterial,
+  materialStreamUrl,
+} from "@/lib/api/materials";
 import type { Chapter, Lesson, Material, MaterialFileType } from "@/lib/types";
 import { AssignmentsSection } from "./assignments-section";
 import { Badge } from "@/components/ui/badge";
@@ -440,27 +446,42 @@ export function MaterialsList({ lessonId, canManage }: { lessonId: number; canMa
   return (
     <div className="mt-2 flex flex-col gap-2">
       {materials?.map((m) => (
-        <div key={m.id} className="flex w-full items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={() => downloadMutation.mutate({ id: m.id, fileName: m.file_name })}
-            disabled={downloadMutation.isPending}
-            className="flex min-w-0 items-center gap-2 text-sm text-primary hover:underline disabled:opacity-50"
-          >
-            <DownloadIcon className="size-4 shrink-0" />
-            <span className="truncate">{m.file_name}</span>
-            <Badge variant="secondary">{fileTypeLabel[m.file_type]}</Badge>
-          </button>
-          {canManage && (
-            <Button
+        <div key={m.id} className="flex w-full flex-col gap-2">
+          <div className="flex w-full items-center justify-between gap-2">
+            <button
               type="button"
-              size="icon-sm"
-              variant="ghost"
-              aria-label="Xóa tài liệu"
-              onClick={() => setDeleteTarget(m)}
+              onClick={() => downloadMutation.mutate({ id: m.id, fileName: m.file_name })}
+              disabled={downloadMutation.isPending}
+              className="flex min-w-0 items-center gap-2 text-sm text-primary hover:underline disabled:opacity-50"
             >
-              <TrashIcon className="size-4" />
-            </Button>
+              <DownloadIcon className="size-4 shrink-0" />
+              <span className="truncate">{m.file_name}</span>
+              <Badge variant="secondary">{fileTypeLabel[m.file_type]}</Badge>
+            </button>
+            {canManage && (
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                aria-label="Xóa tài liệu"
+                onClick={() => setDeleteTarget(m)}
+              >
+                <TrashIcon className="size-4" />
+              </Button>
+            )}
+          </div>
+          {/* US4.5 — video phát trực tiếp trong trang, không cần bấm tải về
+              mới xem được; thẻ <video> tự hỗ trợ tua (Range) nhờ backend
+              dùng http.ServeContent ở endpoint /stream. */}
+          {m.file_type === "video" && m.stream_token && (
+            <video
+              controls
+              preload="metadata"
+              className="w-full max-w-md rounded-md border"
+              src={materialStreamUrl(m.id, m.stream_token)}
+            >
+              Trình duyệt của bạn không hỗ trợ phát video.
+            </video>
           )}
         </div>
       ))}

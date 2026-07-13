@@ -38,3 +38,12 @@ export async function downloadMaterial(materialId: number, fileName: string) {
 export async function deleteMaterial(materialId: number) {
   await apiClient.delete(`/materials/${materialId}`);
 }
+
+// US4.5 — thẻ <video src="..."> không gửi được header Authorization nên
+// không thể trỏ thẳng vào /materials/:id/download; backend mint sẵn 1
+// stream_token ngắn hạn (30 phút) kèm theo material loại video trong
+// listMaterials(), ghép vào query string để endpoint /stream xác thực.
+export function materialStreamUrl(materialId: number, streamToken: string) {
+  const base = apiClient.defaults.baseURL ?? "";
+  return `${base}/materials/${materialId}/stream?token=${encodeURIComponent(streamToken)}`;
+}

@@ -28,17 +28,25 @@ type MaterialService interface {
 	Delete(ctx context.Context, materialID, userID uint, role user.Role) error
 }
 
+// StreamTokenIssuer mint token ngắn hạn (US4.5) cho thẻ <video src="...">
+// dùng thay Bearer header — hiện thực bởi 1 *security.JWTIssuer riêng, TTL
+// ngắn hơn hẳn JWT đăng nhập chính.
+type StreamTokenIssuer interface {
+	Issue(userID uint, role user.Role) (string, error)
+}
+
 type MaterialHandler struct {
 	service MaterialService
 	log     *zap.Logger
 	// uploadsDir là thư mục gốc lưu file vật lý trên đĩa (US4.3: cần để mở
 	// file thật khi phục vụ download, thay vì serve tĩnh qua http.FileServer
 	// không kiểm tra quyền như trước).
-	uploadsDir string
+	uploadsDir   string
+	streamTokens StreamTokenIssuer
 }
 
-func NewMaterialHandler(service MaterialService, log *zap.Logger, uploadsDir string) *MaterialHandler {
-	return &MaterialHandler{service: service, log: log, uploadsDir: uploadsDir}
+func NewMaterialHandler(service MaterialService, log *zap.Logger, uploadsDir string, streamTokens StreamTokenIssuer) *MaterialHandler {
+	return &MaterialHandler{service: service, log: log, uploadsDir: uploadsDir, streamTokens: streamTokens}
 }
 
 type materialResponse struct {
@@ -47,6 +55,10 @@ type materialResponse struct {
 	FileName string `json:"file_name"`
 	FilePath string `json:"file_path"`
 	FileType string `json:"file_type"`
+	// StreamToken chỉ có giá trị khi FileType == "video" (US4.5) — Frontend
+	// dùng token này ghép vào query string src="/materials/:id/stream?token=..."
+	// vì thẻ <video> không gửi được header Authorization.
+	StreamToken string `json:"stream_token,omitempty"`
 }
 
 func toMaterialResponse(m *material.Material) materialResponse {
@@ -108,7 +120,15 @@ func (h *MaterialHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]materialResponse, 0, len(materials))
 	for _, m := range materials {
-		out = append(out, toMaterialResponse(m))
+		resp := toMaterialResponse(m)
+		if m.FileType() == material.FileTypeVideo {
+			if tok, err := h.streamTokens.Issue(claims.UserID, claims.Role); err != nil {
+				h.log.Error("material handler: tạo stream token lỗi", zap.Error(err))
+			} else {
+				resp.StreamToken = tok
+			}
+		}
+		out = append(out, resp)
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -152,6 +172,50 @@ func (h *MaterialHandler) Download(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, m.FileName()))
+	http.ServeContent(w, r, m.FileName(), info.ModTime(), f)
+}
+
+// Stream xử lý GET /api/materials/{id}/stream (US4.5), gắn với
+// middleware.RequireStreamAuth (xác thực qua query param "token" thay vì
+// header, vì thẻ <video> gọi thẳng). Khác Download: không set
+// Content-Disposition: attachment (để trình duyệt phát trực tiếp thay vì
+// tải file), và chỉ phục vụ file loại video.
+func (h *MaterialHandler) Stream(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.ClaimsFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "thiếu thông tin xác thực")
+		return
+	}
+	materialID, err := parseUintParam(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "material id không hợp lệ")
+		return
+	}
+	m, err := h.service.Get(r.Context(), materialID, claims.UserID, claims.Role)
+	if err != nil {
+		h.handleError(w, err)
+		return
+	}
+	if m.FileType() != material.FileTypeVideo {
+		writeError(w, http.StatusBadRequest, "tài liệu này không phải video")
+		return
+	}
+
+	fullPath := filepath.Join(h.uploadsDir, m.FilePath())
+	f, err := os.Open(fullPath)
+	if err != nil {
+		h.log.Error("material handler: mở file lỗi", zap.Error(err))
+		writeError(w, http.StatusInternalServerError, "lỗi hệ thống, vui lòng thử lại sau")
+		return
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		h.log.Error("material handler: đọc thông tin file lỗi", zap.Error(err))
+		writeError(w, http.StatusInternalServerError, "lỗi hệ thống, vui lòng thử lại sau")
+		return
+	}
+
 	http.ServeContent(w, r, m.FileName(), info.ModTime(), f)
 }
 

@@ -33,6 +33,9 @@ export type Material = {
   file_name: string;
   file_path: string;
   file_type: MaterialFileType;
+  // US4.5 — chỉ có khi file_type === "video"; token ngắn hạn để phát trực
+  // tiếp qua /materials/:id/stream (xem lib/api/materials.ts).
+  stream_token?: string;
 };
 
 export type EnrolledStudent = {

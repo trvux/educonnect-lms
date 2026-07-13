@@ -29,6 +29,9 @@ type Deps struct {
 	PasswordResetHandler *handler.PasswordResetHandler
 	RoleUpgradeHandler   *handler.RoleUpgradeHandler
 	TokenVerifier        middleware.TokenVerifier
+	// StreamTokenVerifier xác thực token ngắn hạn riêng cho US4.5 (query
+	// param "token", khác JWT đăng nhập dài hạn ở TokenVerifier).
+	StreamTokenVerifier middleware.TokenVerifier
 	// UploadsDir là thư mục lưu file vật lý (US4.1), phục vụ tĩnh qua
 	// /uploads/* để frontend tải xuống (US4.2).
 	UploadsDir string
@@ -92,6 +95,14 @@ func New(deps Deps) http.Handler {
 			r.Use(middleware.OptionalAuth(deps.TokenVerifier))
 			r.Get("/lessons/{id}/assignments", deps.AssignmentHandler.List)
 			r.Get("/assignments/{id}", deps.AssignmentHandler.Get)
+		})
+
+		// US4.5: nhóm route riêng cho <video src="...">, xác thực qua query
+		// param "token" (RequireStreamAuth) thay vì header Authorization mà
+		// thẻ video không gửi được.
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.RequireStreamAuth(deps.StreamTokenVerifier))
+			r.Get("/materials/{id}/stream", deps.MaterialHandler.Stream)
 		})
 
 		r.Group(func(r chi.Router) {

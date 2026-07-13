@@ -69,6 +69,10 @@ func main() {
 	roleUpgradeRepo := postgres.NewRoleUpgradeRepository(pool)
 	hasher := security.NewBcryptHasher()
 	tokens := security.NewJWTIssuer(cfg.JWTSecret, 24*time.Hour)
+	// US4.5: token riêng cho <video src="...">, TTL ngắn hơn hẳn JWT đăng
+	// nhập chính vì token này lộ ra trong query string URL (xem thiết kế ở
+	// Câu 3b báo cáo Sprint 5).
+	streamTokens := security.NewJWTIssuer(cfg.JWTSecret, 30*time.Minute)
 	fileStorage, err := storage.NewLocalFileStorage("uploads")
 	if err != nil {
 		log.Fatal("khởi tạo file storage thất bại", zap.Error(err))
@@ -95,7 +99,7 @@ func main() {
 	courseHandler := handler.NewCourseHandler(courseSvc, log)
 	curriculumHandler := handler.NewCurriculumHandler(curriculumSvc, log)
 	enrollmentHandler := handler.NewEnrollmentHandler(enrollmentSvc, log)
-	materialHandler := handler.NewMaterialHandler(materialSvc, log, "uploads")
+	materialHandler := handler.NewMaterialHandler(materialSvc, log, "uploads", streamTokens)
 	assignmentHandler := handler.NewAssignmentHandler(assignmentSvc, log)
 	submissionHandler := handler.NewSubmissionHandler(submissionSvc, log)
 	gradebookHandler := handler.NewGradebookHandler(gradebookSvc, courseSvc, log)
@@ -122,6 +126,7 @@ func main() {
 		PasswordResetHandler: passwordResetHandler,
 		RoleUpgradeHandler:   roleUpgradeHandler,
 		TokenVerifier:        tokens,
+		StreamTokenVerifier:  streamTokens,
 		UploadsDir:           "uploads",
 	})
 
