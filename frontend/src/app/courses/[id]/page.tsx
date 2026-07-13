@@ -1,6 +1,7 @@
 "use client";
 
 import { use } from "react";
+import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -16,6 +17,8 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChaptersSection } from "./chapters-section";
+import { ForumSection } from "./forum-section";
+import { NotificationSendDialog } from "./notification-send-dialog";
 
 async function getCourse(id: number) {
   const res = await apiClient.get<Course>(`/courses/${id}`);
@@ -124,6 +127,14 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
             Duyệt khóa học
           </Button>
         )}
+        {canManage && (
+          <>
+            <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/courses/${courseId}/gradebook`} />}>
+              Bảng điểm
+            </Button>
+            <NotificationSendDialog courseId={courseId} />
+          </>
+        )}
       </div>
 
       <Separator className="my-6" />
@@ -164,6 +175,9 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
           </Card>
         </>
       )}
+
+      <Separator className="my-6" />
+      <ForumSection courseId={courseId} />
     </div>
   );
 }

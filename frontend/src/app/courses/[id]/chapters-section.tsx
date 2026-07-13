@@ -12,6 +12,7 @@ import {
   createLesson,
 } from "@/lib/api/curriculum";
 import { listMaterials, uploadMaterial, materialDownloadUrl } from "@/lib/api/materials";
+import { AssignmentsSection } from "./assignments-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -136,6 +137,7 @@ function LessonsSection({ chapterId, canManage }: { chapterId: number; canManage
         <div key={lesson.id} className="rounded-md border p-3">
           <p className="font-medium">{lesson.title}</p>
           <MaterialsList lessonId={lesson.id} canManage={canManage} />
+          <AssignmentsSection lessonId={lesson.id} canManage={canManage} />
         </div>
       ))}
 

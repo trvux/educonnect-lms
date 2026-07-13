@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession, clearToken } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
+import { NotificationBell } from "@/components/notification-bell";
 
 const HIDDEN_ON = ["/login", "/register"];
 
@@ -42,6 +43,20 @@ export function Navbar() {
               Duyệt khóa học
             </Button>
           )}
+
+          {session?.role === "student" && (
+            <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/dashboard" />}>
+              Tiến độ
+            </Button>
+          )}
+
+          {(session?.role === "teacher" || session?.role === "admin") && (
+            <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/reports" />}>
+              Báo cáo
+            </Button>
+          )}
+
+          {session && <NotificationBell />}
 
           {session ? (
             <Button variant="outline" size="sm" onClick={handleLogout}>
