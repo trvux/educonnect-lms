@@ -87,6 +87,7 @@ function CreateAssignmentDialog({ lessonId }: { lessonId: number }) {
   const [description, setDescription] = useState("");
   const [kind, setKind] = useState<AssignmentKind>("essay");
   const [dueAt, setDueAt] = useState("");
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState("");
   const [questions, setQuestions] = useState<QuestionDraft[]>([emptyQuestion()]);
 
   function resetForm() {
@@ -94,6 +95,7 @@ function CreateAssignmentDialog({ lessonId }: { lessonId: number }) {
     setDescription("");
     setKind("essay");
     setDueAt("");
+    setTimeLimitMinutes("");
     setQuestions([emptyQuestion()]);
   }
 
@@ -105,6 +107,8 @@ function CreateAssignmentDialog({ lessonId }: { lessonId: number }) {
         kind,
         questions: kind === "quiz" ? questions : [],
         due_at: dueAt ? new Date(dueAt).toISOString() : undefined,
+        time_limit_minutes:
+          kind === "quiz" && timeLimitMinutes ? Number(timeLimitMinutes) : undefined,
       }),
     onSuccess: () => {
       toast.success("Đã tạo bài tập");
@@ -170,6 +174,19 @@ function CreateAssignmentDialog({ lessonId }: { lessonId: number }) {
               <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
             </div>
           </div>
+
+          {kind === "quiz" && (
+            <div className="flex flex-col gap-2">
+              <Label>Thời gian làm bài (phút, tùy chọn)</Label>
+              <Input
+                type="number"
+                min={1}
+                value={timeLimitMinutes}
+                onChange={(e) => setTimeLimitMinutes(e.target.value)}
+                placeholder="Không giới hạn nếu để trống"
+              />
+            </div>
+          )}
 
           {kind === "quiz" && (
             <div className="flex flex-col gap-3">

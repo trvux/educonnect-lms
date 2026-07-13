@@ -16,6 +16,10 @@ var (
 	ErrQuizNeedsQuestions = errors.New("assignment: bài trắc nghiệm phải có ít nhất 1 câu hỏi")
 	ErrInvalidQuestion    = errors.New("assignment: câu hỏi không hợp lệ (thiếu nội dung, dưới 2 lựa chọn, hoặc đáp án đúng nằm ngoài danh sách lựa chọn)")
 	ErrNotFound           = errors.New("assignment: không tìm thấy")
+	// ErrInvalidTimeLimit (US5.4): giới hạn thời gian (nếu có) phải là số
+	// phút dương; chỉ áp dụng cho bài trắc nghiệm (essay không có khái niệm
+	// "làm bài trong X phút" vì nộp file, không tính giờ).
+	ErrInvalidTimeLimit = errors.New("assignment: giới hạn thời gian làm bài phải lớn hơn 0 phút")
 )
 
 // Type phân biệt bài tập tự luận (essay — học viên nộp file) và bài trắc
@@ -50,17 +54,18 @@ func (q Question) validate() error {
 
 // Assignment đại diện cho 1 bài tập/trắc nghiệm gắn với 1 Lesson.
 type Assignment struct {
-	id          uint
-	lessonID    uint
-	title       string
-	description string
-	kind        Type
-	questions   []Question
-	dueAt       *time.Time
-	createdAt   time.Time
+	id               uint
+	lessonID         uint
+	title            string
+	description      string
+	kind             Type
+	questions        []Question
+	dueAt            *time.Time
+	timeLimitMinutes *int
+	createdAt        time.Time
 }
 
-func NewAssignment(lessonID uint, title, description string, kind Type, questions []Question, dueAt *time.Time) (*Assignment, error) {
+func NewAssignment(lessonID uint, title, description string, kind Type, questions []Question, dueAt *time.Time, timeLimitMinutes *int) (*Assignment, error) {
 	if lessonID == 0 {
 		return nil, ErrInvalidLessonID
 	}
@@ -79,44 +84,51 @@ func NewAssignment(lessonID uint, title, description string, kind Type, question
 				return nil, err
 			}
 		}
+		if timeLimitMinutes != nil && *timeLimitMinutes <= 0 {
+			return nil, ErrInvalidTimeLimit
+		}
 	} else {
 		questions = nil
+		timeLimitMinutes = nil // essay nộp file, không có khái niệm giới hạn thời gian
 	}
 
 	return &Assignment{
-		lessonID:    lessonID,
-		title:       title,
-		description: description,
-		kind:        kind,
-		questions:   questions,
-		dueAt:       dueAt,
-		createdAt:   time.Now().UTC(),
+		lessonID:         lessonID,
+		title:            title,
+		description:      description,
+		kind:             kind,
+		questions:        questions,
+		dueAt:            dueAt,
+		timeLimitMinutes: timeLimitMinutes,
+		createdAt:        time.Now().UTC(),
 	}, nil
 }
 
-func Rehydrate(id, lessonID uint, title, description string, kind Type, questions []Question, dueAt *time.Time, createdAt time.Time) *Assignment {
+func Rehydrate(id, lessonID uint, title, description string, kind Type, questions []Question, dueAt *time.Time, timeLimitMinutes *int, createdAt time.Time) *Assignment {
 	return &Assignment{
-		id:          id,
-		lessonID:    lessonID,
-		title:       title,
-		description: description,
-		kind:        kind,
-		questions:   questions,
-		dueAt:       dueAt,
-		createdAt:   createdAt,
+		id:               id,
+		lessonID:         lessonID,
+		title:            title,
+		description:      description,
+		kind:             kind,
+		questions:        questions,
+		dueAt:            dueAt,
+		timeLimitMinutes: timeLimitMinutes,
+		createdAt:        createdAt,
 	}
 }
 
 func (a *Assignment) SetID(id uint) { a.id = id }
 
-func (a *Assignment) ID() uint              { return a.id }
-func (a *Assignment) LessonID() uint        { return a.lessonID }
-func (a *Assignment) Title() string         { return a.title }
-func (a *Assignment) Description() string   { return a.description }
-func (a *Assignment) Kind() Type            { return a.kind }
-func (a *Assignment) Questions() []Question { return a.questions }
-func (a *Assignment) DueAt() *time.Time     { return a.dueAt }
-func (a *Assignment) CreatedAt() time.Time  { return a.createdAt }
+func (a *Assignment) ID() uint               { return a.id }
+func (a *Assignment) LessonID() uint         { return a.lessonID }
+func (a *Assignment) Title() string          { return a.title }
+func (a *Assignment) Description() string    { return a.description }
+func (a *Assignment) Kind() Type             { return a.kind }
+func (a *Assignment) Questions() []Question  { return a.questions }
+func (a *Assignment) DueAt() *time.Time      { return a.dueAt }
+func (a *Assignment) TimeLimitMinutes() *int { return a.timeLimitMinutes }
+func (a *Assignment) CreatedAt() time.Time   { return a.createdAt }
 
 type Repository interface {
 	Create(ctx context.Context, a *Assignment) error

@@ -175,6 +175,7 @@ func (h *SubmissionHandler) handleError(w http.ResponseWriter, err error) {
 	case errors.Is(err, submission.ErrAlreadySubmitted):
 		writeError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, submission.ErrPastDue),
+		errors.Is(err, submission.ErrTimeExpired),
 		errors.Is(err, submission.ErrAnswerCountMismatch),
 		errors.Is(err, submission.ErrEmptySubmission),
 		errors.Is(err, submission.ErrInvalidScore):

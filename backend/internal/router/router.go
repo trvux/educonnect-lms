@@ -29,6 +29,7 @@ type Deps struct {
 	PasswordResetHandler    *handler.PasswordResetHandler
 	RoleUpgradeHandler      *handler.RoleUpgradeHandler
 	LessonCompletionHandler *handler.LessonCompletionHandler
+	QuizAttemptHandler      *handler.QuizAttemptHandler
 	TokenVerifier           middleware.TokenVerifier
 	// StreamTokenVerifier xác thực token ngắn hạn riêng cho US4.5 (query
 	// param "token", khác JWT đăng nhập dài hạn ở TokenVerifier).
@@ -133,6 +134,7 @@ func New(deps Deps) http.Handler {
 				r.Get("/me/progress", deps.ProgressHandler.Me)                              // US7.1
 				r.Post("/me/role-upgrade-request", deps.RoleUpgradeHandler.Create)          // US1.7
 				r.Post("/lessons/{id}/complete", deps.LessonCompletionHandler.MarkComplete) // US4.10
+				r.Post("/assignments/{id}/start-attempt", deps.QuizAttemptHandler.Start)    // US5.4
 			})
 
 			r.Group(func(r chi.Router) {

@@ -17,6 +17,9 @@ var (
 	ErrAnswerCountMismatch = errors.New("submission: số lượng đáp án không khớp số câu hỏi")
 	ErrNotFound            = errors.New("submission: không tìm thấy")
 	ErrInvalidScore        = errors.New("submission: điểm phải nằm trong khoảng 0-10")
+	// ErrTimeExpired (US5.4): bài trắc nghiệm có giới hạn thời gian, học
+	// viên nộp sau khi đã hết giờ tính từ lúc bắt đầu làm (quizattempt).
+	ErrTimeExpired = errors.New("submission: đã hết thời gian làm bài trắc nghiệm")
 )
 
 // Submission là bài làm của 1 học viên cho 1 Assignment. Content dùng cho

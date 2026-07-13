@@ -46,9 +46,9 @@ func TestProgressRepository_ForStudent(t *testing.T) {
 	require.NoError(t, lessonRepo.Create(ctx, l))
 
 	assignmentRepo := postgres.NewAssignmentRepository(pool)
-	a1, _ := assignment.NewAssignment(l.ID(), "Bai tap 1", "", assignment.TypeEssay, nil, nil)
+	a1, _ := assignment.NewAssignment(l.ID(), "Bai tap 1", "", assignment.TypeEssay, nil, nil, nil)
 	require.NoError(t, assignmentRepo.Create(ctx, a1))
-	a2, _ := assignment.NewAssignment(l.ID(), "Bai tap 2", "", assignment.TypeEssay, nil, nil)
+	a2, _ := assignment.NewAssignment(l.ID(), "Bai tap 2", "", assignment.TypeEssay, nil, nil, nil)
 	require.NoError(t, assignmentRepo.Create(ctx, a2))
 
 	submissionRepo := postgres.NewSubmissionRepository(pool)

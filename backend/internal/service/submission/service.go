@@ -12,6 +12,7 @@ import (
 	"educonnect-lms/backend/internal/domain/assignment"
 	"educonnect-lms/backend/internal/domain/course"
 	"educonnect-lms/backend/internal/domain/curriculum"
+	"educonnect-lms/backend/internal/domain/quizattempt"
 	"educonnect-lms/backend/internal/domain/submission"
 )
 
@@ -27,12 +28,19 @@ type CourseGetter interface {
 	FindByID(ctx context.Context, id uint) (*course.Course, error)
 }
 
+// QuizAttemptGetter là tập con method của quizattempt.Repository — chỉ cần
+// đọc, để tính thời điểm bắt đầu làm bài trắc nghiệm (US5.4).
+type QuizAttemptGetter interface {
+	FindByAssignmentAndStudent(ctx context.Context, assignmentID, studentID uint) (*quizattempt.QuizAttempt, error)
+}
+
 type Service struct {
-	submissions submission.Repository
-	assignments AssignmentGetter
-	lessons     curriculum.LessonRepository
-	chapters    curriculum.ChapterRepository
-	courses     CourseGetter
+	submissions  submission.Repository
+	assignments  AssignmentGetter
+	lessons      curriculum.LessonRepository
+	chapters     curriculum.ChapterRepository
+	courses      CourseGetter
+	quizAttempts QuizAttemptGetter
 }
 
 func NewService(
@@ -41,13 +49,15 @@ func NewService(
 	lessons curriculum.LessonRepository,
 	chapters curriculum.ChapterRepository,
 	courses CourseGetter,
+	quizAttempts QuizAttemptGetter,
 ) *Service {
 	return &Service{
-		submissions: submissions,
-		assignments: assignments,
-		lessons:     lessons,
-		chapters:    chapters,
-		courses:     courses,
+		submissions:  submissions,
+		assignments:  assignments,
+		lessons:      lessons,
+		chapters:     chapters,
+		courses:      courses,
+		quizAttempts: quizAttempts,
 	}
 }
 
@@ -67,6 +77,24 @@ func (s *Service) Submit(ctx context.Context, assignmentID, studentID uint, cont
 
 	if a.Kind() == assignment.TypeQuiz && len(answers) != len(a.Questions()) {
 		return nil, submission.ErrAnswerCountMismatch
+	}
+
+	// US5.4: nếu bài trắc nghiệm có giới hạn thời gian và học viên đã có
+	// attempt (bắt đầu qua trang làm bài), chặn nộp khi đã quá giờ tính từ
+	// StartedAt do server ghi nhận (không tin đồng hồ phía client). Nếu
+	// chưa từng có attempt (gọi thẳng API mà chưa qua bước bắt đầu), không
+	// đủ dữ kiện để tính hết giờ — cho phép nộp, không phạt oan.
+	if a.Kind() == assignment.TypeQuiz && a.TimeLimitMinutes() != nil {
+		attempt, err := s.quizAttempts.FindByAssignmentAndStudent(ctx, assignmentID, studentID)
+		if err != nil && !errors.Is(err, quizattempt.ErrNotFound) {
+			return nil, err
+		}
+		if err == nil {
+			limit := time.Duration(*a.TimeLimitMinutes()) * time.Minute
+			if time.Now().UTC().Sub(attempt.StartedAt()) > limit {
+				return nil, submission.ErrTimeExpired
+			}
+		}
 	}
 
 	_, err = s.submissions.FindByAssignmentAndStudent(ctx, assignmentID, studentID)

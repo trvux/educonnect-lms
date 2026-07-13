@@ -37,14 +37,14 @@ func TestAssignmentRepository(t *testing.T) {
 
 	assignmentRepo := postgres.NewAssignmentRepository(pool)
 
-	essay, err := assignment.NewAssignment(l.ID(), "Bai tap tu luan", "Nop file .go", assignment.TypeEssay, nil, nil)
+	essay, err := assignment.NewAssignment(l.ID(), "Bai tap tu luan", "Nop file .go", assignment.TypeEssay, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, assignmentRepo.Create(ctx, essay))
 	assert.NotZero(t, essay.ID())
 
 	quiz, err := assignment.NewAssignment(l.ID(), "Trac nghiem chuong 1", "", assignment.TypeQuiz, []assignment.Question{
 		{Content: "1 + 1 = ?", Options: []string{"1", "2", "3"}, CorrectIndex: 1},
-	}, nil)
+	}, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, assignmentRepo.Create(ctx, quiz))
 

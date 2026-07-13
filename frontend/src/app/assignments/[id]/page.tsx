@@ -1,10 +1,11 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { TimerIcon } from "@phosphor-icons/react";
 
-import { getAssignment } from "@/lib/api/assignments";
+import { getAssignment, startQuizAttempt } from "@/lib/api/assignments";
 import { getMySubmission, submitAssignment } from "@/lib/api/submissions";
 import { useSession } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +40,16 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
     enabled: isStudent,
   });
 
+  // US5.4 — chỉ ghi nhận "bắt đầu làm bài" khi thật sự cần đếm giờ (quiz có
+  // time_limit_minutes, học viên chưa nộp). Idempotent: refresh trang không
+  // reset đồng hồ vì backend trả lại đúng started_at gốc.
+  const hasTimeLimit = assignment?.kind === "quiz" && !!assignment.time_limit_minutes;
+  const { data: quizAttempt } = useQuery({
+    queryKey: ["quiz-attempt", assignmentId],
+    queryFn: () => startQuizAttempt(assignmentId),
+    enabled: isStudent && hasTimeLimit && !isMySubmissionLoading && !mySubmission,
+  });
+
   const submitMutation = useMutation({
     mutationFn: () => {
       if (assignment?.kind === "quiz") {
@@ -63,6 +74,30 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
       }
     },
   });
+
+  // US5.4 — đồng hồ đếm ngược tính từ started_at (server) + time_limit_minutes;
+  // khi hết giờ, tự động gọi Nộp bài với đáp án hiện có (submitMutation.mutate
+  // luôn dùng answers/content mới nhất tại thời điểm gọi, không cần ref).
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+  const deadline =
+    quizAttempt && assignment?.time_limit_minutes
+      ? new Date(quizAttempt.started_at).getTime() + assignment.time_limit_minutes * 60_000
+      : null;
+
+  useEffect(() => {
+    if (!deadline || mySubmission) return;
+    const interval = setInterval(() => {
+      const secondsLeft = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+      setRemainingSeconds(secondsLeft);
+      if (secondsLeft <= 0) {
+        clearInterval(interval);
+        toast.info("Đã hết giờ làm bài, đang tự động nộp bài...");
+        submitMutation.mutate();
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deadline, mySubmission]);
 
   if (isLoading) {
     return (
@@ -90,6 +125,13 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">{assignment.title}</h1>
         <Badge variant="secondary">{assignment.kind === "quiz" ? "Trắc nghiệm" : "Tự luận"}</Badge>
+        {isStudent && !mySubmission && remainingSeconds !== null && (
+          <Badge variant={remainingSeconds <= 60 ? "destructive" : "outline"} className="gap-1">
+            <TimerIcon className="size-3.5" />
+            Còn lại: {String(Math.floor(remainingSeconds / 60)).padStart(2, "0")}:
+            {String(remainingSeconds % 60).padStart(2, "0")}
+          </Badge>
+        )}
       </div>
       {assignment.description && (
         <p className="mt-2 text-sm text-muted-foreground">{assignment.description}</p>

@@ -59,12 +59,12 @@ func (r *AssignmentRepository) Create(ctx context.Context, a *assignment.Assignm
 	}
 
 	const q = `
-		INSERT INTO assignments (lesson_id, title, description, kind, questions, due_at, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO assignments (lesson_id, title, description, kind, questions, due_at, time_limit_minutes, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id`
 	var id uint
 	err = r.pool.QueryRow(ctx, q,
-		a.LessonID(), a.Title(), a.Description(), string(a.Kind()), questionsData, a.DueAt(), a.CreatedAt(),
+		a.LessonID(), a.Title(), a.Description(), string(a.Kind()), questionsData, a.DueAt(), a.TimeLimitMinutes(), a.CreatedAt(),
 	).Scan(&id)
 	if err != nil {
 		return fmt.Errorf("postgres: tạo assignment lỗi: %w", err)
@@ -74,7 +74,7 @@ func (r *AssignmentRepository) Create(ctx context.Context, a *assignment.Assignm
 }
 
 func (r *AssignmentRepository) FindByID(ctx context.Context, id uint) (*assignment.Assignment, error) {
-	const q = `SELECT id, lesson_id, title, description, kind, questions, due_at, created_at FROM assignments WHERE id = $1`
+	const q = `SELECT id, lesson_id, title, description, kind, questions, due_at, time_limit_minutes, created_at FROM assignments WHERE id = $1`
 	row := r.pool.QueryRow(ctx, q, id)
 	a, err := scanAssignment(row)
 	if err != nil {
@@ -88,7 +88,7 @@ func (r *AssignmentRepository) FindByID(ctx context.Context, id uint) (*assignme
 
 func (r *AssignmentRepository) ListByLesson(ctx context.Context, lessonID uint) ([]*assignment.Assignment, error) {
 	const q = `
-		SELECT id, lesson_id, title, description, kind, questions, due_at, created_at
+		SELECT id, lesson_id, title, description, kind, questions, due_at, time_limit_minutes, created_at
 		FROM assignments WHERE lesson_id = $1 ORDER BY created_at ASC`
 	rows, err := r.pool.Query(ctx, q, lessonID)
 	if err != nil {
@@ -120,14 +120,15 @@ func scanAssignment(row rowScanner) (*assignment.Assignment, error) {
 		kind               string
 		questionsData      []byte
 		dueAt              *time.Time
+		timeLimitMinutes   *int
 		createdAt          time.Time
 	)
-	if err := row.Scan(&id, &lessonID, &title, &description, &kind, &questionsData, &dueAt, &createdAt); err != nil {
+	if err := row.Scan(&id, &lessonID, &title, &description, &kind, &questionsData, &dueAt, &timeLimitMinutes, &createdAt); err != nil {
 		return nil, err
 	}
 	questions, err := decodeQuestions(questionsData)
 	if err != nil {
 		return nil, fmt.Errorf("decode câu hỏi lỗi: %w", err)
 	}
-	return assignment.Rehydrate(id, lessonID, title, description, assignment.Type(kind), questions, dueAt, createdAt), nil
+	return assignment.Rehydrate(id, lessonID, title, description, assignment.Type(kind), questions, dueAt, timeLimitMinutes, createdAt), nil
 }

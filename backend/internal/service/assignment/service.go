@@ -20,13 +20,14 @@ func NewService(assignments assignment.Repository, lessons curriculum.LessonRepo
 }
 
 // Create hiện thực US5.1: xác nhận Lesson tồn tại rồi tạo bài tập/trắc
-// nghiệm gắn với Lesson đó.
-func (s *Service) Create(ctx context.Context, lessonID uint, title, description string, kind assignment.Type, questions []assignment.Question, dueAt *time.Time) (*assignment.Assignment, error) {
+// nghiệm gắn với Lesson đó. timeLimitMinutes (US5.4) chỉ có ý nghĩa với bài
+// trắc nghiệm — assignment.NewAssignment tự bỏ qua nếu kind là essay.
+func (s *Service) Create(ctx context.Context, lessonID uint, title, description string, kind assignment.Type, questions []assignment.Question, dueAt *time.Time, timeLimitMinutes *int) (*assignment.Assignment, error) {
 	if _, err := s.lessons.FindByID(ctx, lessonID); err != nil {
 		return nil, err
 	}
 
-	a, err := assignment.NewAssignment(lessonID, title, description, kind, questions, dueAt)
+	a, err := assignment.NewAssignment(lessonID, title, description, kind, questions, dueAt, timeLimitMinutes)
 	if err != nil {
 		return nil, err
 	}

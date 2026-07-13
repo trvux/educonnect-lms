@@ -64,7 +64,7 @@ func TestService_Create(t *testing.T) {
 	assignments := &fakeAssignmentRepo{}
 	svc := assignmentservice.NewService(assignments, lessons)
 
-	a, err := svc.Create(context.Background(), 1, "Bai tap tu luan", "Nop file", assignment.TypeEssay, nil, nil)
+	a, err := svc.Create(context.Background(), 1, "Bai tap tu luan", "Nop file", assignment.TypeEssay, nil, nil, nil)
 	require.NoError(t, err)
 	assert.NotZero(t, a.ID())
 
@@ -81,7 +81,7 @@ func TestService_Create_LessonNotFound(t *testing.T) {
 	lessons := &fakeLessonRepo{exists: map[uint]bool{}}
 	svc := assignmentservice.NewService(&fakeAssignmentRepo{}, lessons)
 
-	_, err := svc.Create(context.Background(), 999, "Bai tap", "", assignment.TypeEssay, nil, nil)
+	_, err := svc.Create(context.Background(), 999, "Bai tap", "", assignment.TypeEssay, nil, nil, nil)
 	assert.ErrorIs(t, err, curriculum.ErrLessonNotFound)
 }
 
@@ -89,6 +89,6 @@ func TestService_Create_InvalidAssignment(t *testing.T) {
 	lessons := &fakeLessonRepo{exists: map[uint]bool{1: true}}
 	svc := assignmentservice.NewService(&fakeAssignmentRepo{}, lessons)
 
-	_, err := svc.Create(context.Background(), 1, "Trac nghiem", "", assignment.TypeQuiz, nil, nil)
+	_, err := svc.Create(context.Background(), 1, "Trac nghiem", "", assignment.TypeQuiz, nil, nil, nil)
 	assert.ErrorIs(t, err, assignment.ErrQuizNeedsQuestions)
 }

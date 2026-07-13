@@ -25,6 +25,7 @@ import (
 	materialservice "educonnect-lms/backend/internal/service/material"
 	notificationservice "educonnect-lms/backend/internal/service/notification"
 	progressservice "educonnect-lms/backend/internal/service/progress"
+	quizattemptservice "educonnect-lms/backend/internal/service/quizattempt"
 	reportservice "educonnect-lms/backend/internal/service/report"
 	roleupgradeservice "educonnect-lms/backend/internal/service/roleupgrade"
 	submissionservice "educonnect-lms/backend/internal/service/submission"
@@ -69,6 +70,7 @@ func main() {
 	emailVerificationRepo := postgres.NewEmailVerificationRepository(pool)
 	roleUpgradeRepo := postgres.NewRoleUpgradeRepository(pool)
 	lessonCompletionRepo := postgres.NewLessonCompletionRepository(pool)
+	quizAttemptRepo := postgres.NewQuizAttemptRepository(pool)
 	hasher := security.NewBcryptHasher()
 	tokens := security.NewJWTIssuer(cfg.JWTSecret, 24*time.Hour)
 	// US4.5: token riêng cho <video src="...">, TTL ngắn hơn hẳn JWT đăng
@@ -89,13 +91,14 @@ func main() {
 	enrollmentSvc := enrollmentservice.NewService(enrollmentRepo, courseRepo, userRepo)
 	materialSvc := materialservice.NewService(materialRepo, lessonRepo, chapterRepo, courseRepo, enrollmentRepo, fileStorage)
 	assignmentSvc := assignmentservice.NewService(assignmentRepo, lessonRepo)
-	submissionSvc := submissionservice.NewService(submissionRepo, assignmentSvc, lessonRepo, chapterRepo, courseRepo)
+	submissionSvc := submissionservice.NewService(submissionRepo, assignmentSvc, lessonRepo, chapterRepo, courseRepo, quizAttemptRepo)
 	gradebookSvc := gradebookservice.NewService(gradebookRepo)
 	forumSvc := forumservice.NewService(forumRepo, courseRepo)
 	notificationSvc := notificationservice.NewService(notificationRepo, enrollmentRepo, courseRepo)
 	progressSvc := progressservice.NewService(progressRepo)
 	reportSvc := reportservice.NewService(reportRepo)
 	lessonCompletionSvc := lessoncompletionservice.NewService(lessonCompletionRepo, lessonRepo, chapterRepo, courseRepo, enrollmentRepo)
+	quizAttemptSvc := quizattemptservice.NewService(quizAttemptRepo, assignmentSvc)
 
 	// tầng HTTP
 	authHandler := handler.NewAuthHandler(authSvc, log, cfg.AllowRoleOnRegister)
@@ -113,6 +116,7 @@ func main() {
 	passwordResetHandler := handler.NewPasswordResetHandler(authSvc, log)
 	roleUpgradeHandler := handler.NewRoleUpgradeHandler(roleUpgradeSvc, log)
 	lessonCompletionHandler := handler.NewLessonCompletionHandler(lessonCompletionSvc, log)
+	quizAttemptHandler := handler.NewQuizAttemptHandler(quizAttemptSvc, log)
 
 	r := router.New(router.Deps{
 		AuthHandler:             authHandler,
@@ -130,6 +134,7 @@ func main() {
 		PasswordResetHandler:    passwordResetHandler,
 		RoleUpgradeHandler:      roleUpgradeHandler,
 		LessonCompletionHandler: lessonCompletionHandler,
+		QuizAttemptHandler:      quizAttemptHandler,
 		TokenVerifier:           tokens,
 		StreamTokenVerifier:     streamTokens,
 		UploadsDir:              "uploads",

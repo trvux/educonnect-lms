@@ -75,6 +75,14 @@ export type Assignment = {
   kind: AssignmentKind;
   questions: Question[];
   due_at?: string;
+  // US5.4 — chỉ có ở bài trắc nghiệm; có giá trị nghĩa là học viên phải làm
+  // xong trong X phút kể từ lúc bắt đầu (POST /assignments/:id/start-attempt).
+  time_limit_minutes?: number;
+};
+
+// US5.4 — trả về từ POST /assignments/:id/start-attempt.
+export type QuizAttempt = {
+  started_at: string;
 };
 
 export type Submission = {

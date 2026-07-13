@@ -17,7 +17,9 @@ import (
 
 type fakeChapterRepo struct{ byID map[uint]*curriculum.Chapter }
 
-func newFakeChapterRepo() *fakeChapterRepo { return &fakeChapterRepo{byID: map[uint]*curriculum.Chapter{}} }
+func newFakeChapterRepo() *fakeChapterRepo {
+	return &fakeChapterRepo{byID: map[uint]*curriculum.Chapter{}}
+}
 
 func (r *fakeChapterRepo) Create(_ context.Context, c *curriculum.Chapter) error {
 	c.SetID(uint(len(r.byID) + 1))
@@ -105,7 +107,9 @@ func (r *fakeLessonRepo) Delete(_ context.Context, id uint) error {
 
 type fakeCourseGetter struct{ byID map[uint]*course.Course }
 
-func newFakeCourseGetter() *fakeCourseGetter { return &fakeCourseGetter{byID: map[uint]*course.Course{}} }
+func newFakeCourseGetter() *fakeCourseGetter {
+	return &fakeCourseGetter{byID: map[uint]*course.Course{}}
+}
 
 func (r *fakeCourseGetter) FindByID(_ context.Context, id uint) (*course.Course, error) {
 	c, ok := r.byID[id]

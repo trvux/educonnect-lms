@@ -48,7 +48,7 @@ func TestGradebookRepository_ForCourse(t *testing.T) {
 	assignmentRepo := postgres.NewAssignmentRepository(pool)
 	quiz, _ := assignment.NewAssignment(l.ID(), "Trac nghiem", "", assignment.TypeQuiz, []assignment.Question{
 		{Content: "1+1=?", Options: []string{"1", "2", "3"}, CorrectIndex: 1},
-	}, nil)
+	}, nil, nil)
 	require.NoError(t, assignmentRepo.Create(ctx, quiz))
 
 	submissionRepo := postgres.NewSubmissionRepository(pool)

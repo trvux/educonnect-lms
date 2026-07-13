@@ -18,7 +18,7 @@ import (
 // AssignmentService là tập con method của *assignmentservice.Service mà
 // handler cần (US5.1).
 type AssignmentService interface {
-	Create(ctx context.Context, lessonID uint, title, description string, kind assignment.Type, questions []assignment.Question, dueAt *time.Time) (*assignment.Assignment, error)
+	Create(ctx context.Context, lessonID uint, title, description string, kind assignment.Type, questions []assignment.Question, dueAt *time.Time, timeLimitMinutes *int) (*assignment.Assignment, error)
 	Get(ctx context.Context, id uint) (*assignment.Assignment, error)
 	ListByLesson(ctx context.Context, lessonID uint) ([]*assignment.Assignment, error)
 }
@@ -39,11 +39,12 @@ type questionRequest struct {
 }
 
 type createAssignmentRequest struct {
-	Title       string            `json:"title"`
-	Description string            `json:"description"`
-	Kind        string            `json:"kind"`
-	Questions   []questionRequest `json:"questions"`
-	DueAt       *time.Time        `json:"due_at"`
+	Title            string            `json:"title"`
+	Description      string            `json:"description"`
+	Kind             string            `json:"kind"`
+	Questions        []questionRequest `json:"questions"`
+	DueAt            *time.Time        `json:"due_at"`
+	TimeLimitMinutes *int              `json:"time_limit_minutes"`
 }
 
 type questionResponse struct {
@@ -55,13 +56,14 @@ type questionResponse struct {
 }
 
 type assignmentResponse struct {
-	ID          uint               `json:"id"`
-	LessonID    uint               `json:"lesson_id"`
-	Title       string             `json:"title"`
-	Description string             `json:"description"`
-	Kind        string             `json:"kind"`
-	Questions   []questionResponse `json:"questions,omitempty"`
-	DueAt       *time.Time         `json:"due_at,omitempty"`
+	ID               uint               `json:"id"`
+	LessonID         uint               `json:"lesson_id"`
+	Title            string             `json:"title"`
+	Description      string             `json:"description"`
+	Kind             string             `json:"kind"`
+	Questions        []questionResponse `json:"questions,omitempty"`
+	DueAt            *time.Time         `json:"due_at,omitempty"`
+	TimeLimitMinutes *int               `json:"time_limit_minutes,omitempty"`
 }
 
 // canSeeAnswers chỉ giảng viên/quản trị viên đã đăng nhập mới xem được đáp
@@ -85,13 +87,14 @@ func toAssignmentResponse(a *assignment.Assignment, showAnswers bool) assignment
 		questions = append(questions, qr)
 	}
 	return assignmentResponse{
-		ID:          a.ID(),
-		LessonID:    a.LessonID(),
-		Title:       a.Title(),
-		Description: a.Description(),
-		Kind:        string(a.Kind()),
-		Questions:   questions,
-		DueAt:       a.DueAt(),
+		ID:               a.ID(),
+		LessonID:         a.LessonID(),
+		Title:            a.Title(),
+		Description:      a.Description(),
+		Kind:             string(a.Kind()),
+		Questions:        questions,
+		DueAt:            a.DueAt(),
+		TimeLimitMinutes: a.TimeLimitMinutes(),
 	}
 }
 
@@ -114,7 +117,7 @@ func (h *AssignmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		questions[i] = assignment.Question{Content: q.Content, Options: q.Options, CorrectIndex: q.CorrectIndex}
 	}
 
-	a, err := h.service.Create(r.Context(), lessonID, req.Title, req.Description, assignment.Type(req.Kind), questions, req.DueAt)
+	a, err := h.service.Create(r.Context(), lessonID, req.Title, req.Description, assignment.Type(req.Kind), questions, req.DueAt, req.TimeLimitMinutes)
 	if err != nil {
 		h.handleError(w, err)
 		return
@@ -167,7 +170,8 @@ func (h *AssignmentHandler) handleError(w http.ResponseWriter, err error) {
 		errors.Is(err, assignment.ErrInvalidLessonID),
 		errors.Is(err, assignment.ErrInvalidType),
 		errors.Is(err, assignment.ErrQuizNeedsQuestions),
-		errors.Is(err, assignment.ErrInvalidQuestion):
+		errors.Is(err, assignment.ErrInvalidQuestion),
+		errors.Is(err, assignment.ErrInvalidTimeLimit):
 		writeError(w, http.StatusBadRequest, err.Error())
 	default:
 		h.log.Error("assignment handler: lỗi không xác định", zap.Error(err))
