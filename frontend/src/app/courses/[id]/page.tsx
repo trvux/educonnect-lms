@@ -5,10 +5,9 @@ import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/lib/auth";
 import type { Course } from "@/lib/types";
-import { submitCourseForReview, approveCourse } from "@/lib/api/courses";
+import { getCourse, submitCourseForReview, approveCourse } from "@/lib/api/courses";
 import { enrollInCourse, listEnrolledStudents } from "@/lib/api/enrollment";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,11 +18,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ChaptersSection } from "./chapters-section";
 import { ForumSection } from "./forum-section";
 import { NotificationSendDialog } from "./notification-send-dialog";
-
-async function getCourse(id: number) {
-  const res = await apiClient.get<Course>(`/courses/${id}`);
-  return res.data;
-}
 
 const statusLabel: Record<Course["status"], string> = {
   draft: "Nháp",
@@ -115,6 +109,11 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
         {session && session.role === "student" && (
           <Button onClick={() => enrollMutation.mutate()} disabled={enrollMutation.isPending}>
             {enrollMutation.isPending ? "Đang đăng ký..." : "Đăng ký khóa học"}
+          </Button>
+        )}
+        {session && (
+          <Button variant="outline" nativeButton={false} render={<Link href={`/courses/${courseId}/lessons`} />}>
+            Vào học
           </Button>
         )}
         {isOwner && course.status === "draft" && (

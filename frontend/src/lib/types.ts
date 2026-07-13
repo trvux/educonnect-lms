@@ -22,6 +22,9 @@ export type Lesson = {
   position: number;
 };
 
+// US4.9 — chương kèm danh sách bài học lồng sẵn, dùng cho sidebar course player.
+export type CourseOutlineChapter = Chapter & { lessons: Lesson[] };
+
 export type MaterialFileType = "pdf" | "doc" | "excel" | "ppt" | "video" | "archive";
 
 export type Material = {

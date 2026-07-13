@@ -396,7 +396,7 @@ function LessonsSection({ chapterId, canManage }: { chapterId: number; canManage
   );
 }
 
-function MaterialsList({ lessonId, canManage }: { lessonId: number; canManage: boolean }) {
+export function MaterialsList({ lessonId, canManage }: { lessonId: number; canManage: boolean }) {
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState<Material | null>(null);
 

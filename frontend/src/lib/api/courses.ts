@@ -7,6 +7,12 @@ export async function searchCourses(keyword: string) {
   return res.data;
 }
 
+// Xem chi tiết 1 khóa học, public.
+export async function getCourse(id: number) {
+  const res = await apiClient.get<Course>(`/courses/${id}`);
+  return res.data;
+}
+
 // US2.1: giảng viên tạo khóa học (Draft).
 export async function createCourse(input: { title: string; description: string }) {
   const res = await apiClient.post<Course>("/courses", input);

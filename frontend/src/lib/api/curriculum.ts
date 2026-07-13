@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { Chapter, Lesson } from "@/lib/types";
+import type { Chapter, CourseOutlineChapter, Lesson } from "@/lib/types";
 
 // US2.2
 export async function listChapters(courseId: number) {
@@ -40,4 +40,17 @@ export async function renameLesson(lessonId: number, title: string) {
 
 export async function deleteLesson(lessonId: number) {
   await apiClient.delete(`/lessons/${lessonId}`);
+}
+
+// US4.9 — cây chương/bài học đầy đủ của khóa học, dùng để dựng sidebar
+// "course player". Không có endpoint gộp sẵn ở backend nên gọi tuần tự:
+// lấy danh sách chương rồi lấy bài học của từng chương song song.
+export async function getCourseOutline(courseId: number): Promise<CourseOutlineChapter[]> {
+  const chapters = await listChapters(courseId);
+  return Promise.all(
+    chapters.map(async (chapter) => ({
+      ...chapter,
+      lessons: await listLessons(chapter.id),
+    }))
+  );
 }
