@@ -50,3 +50,13 @@ export async function forgotPassword(email: string) {
 export async function resetPassword(input: { email: string; otp: string; new_password: string }) {
   await apiClient.post("/auth/reset-password", input);
 }
+
+// US1.9 — xác thực email lúc đăng ký (tách biệt khoá tài khoản US1.3: xem
+// backend user.ErrEmailNotVerified vs user.ErrInactive, trả HTTP 428 vs 403).
+export async function verifyEmail(input: { email: string; otp: string }) {
+  await apiClient.post("/auth/verify-email", input);
+}
+
+export async function resendVerification(email: string) {
+  await apiClient.post("/auth/resend-verification", { email });
+}

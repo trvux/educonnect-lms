@@ -10,11 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"educonnect-lms/backend/internal/domain/emailverification"
 	"educonnect-lms/backend/internal/domain/passwordreset"
 	"educonnect-lms/backend/internal/domain/user"
 )
 
-// otpTTL là thời gian hiệu lực của mã OTP quên mật khẩu (US1.6).
+// otpTTL là thời gian hiệu lực của mã OTP quên mật khẩu (US1.6) và xác thực
+// email lúc đăng ký (US1.9).
 const otpTTL = 10 * time.Minute
 
 var (
@@ -46,12 +48,13 @@ type EmailSender interface {
 }
 
 type Service struct {
-	users          user.Repository
-	hasher         PasswordHasher
-	tokens         TokenIssuer
-	storage        FileStorage
-	passwordResets passwordreset.Repository
-	emailSender    EmailSender
+	users              user.Repository
+	hasher             PasswordHasher
+	tokens             TokenIssuer
+	storage            FileStorage
+	passwordResets     passwordreset.Repository
+	emailVerifications emailverification.Repository
+	emailSender        EmailSender
 }
 
 func NewService(
@@ -60,15 +63,17 @@ func NewService(
 	tokens TokenIssuer,
 	storage FileStorage,
 	passwordResets passwordreset.Repository,
+	emailVerifications emailverification.Repository,
 	emailSender EmailSender,
 ) *Service {
 	return &Service{
-		users:          users,
-		hasher:         hasher,
-		tokens:         tokens,
-		storage:        storage,
-		passwordResets: passwordResets,
-		emailSender:    emailSender,
+		users:              users,
+		hasher:             hasher,
+		tokens:             tokens,
+		storage:            storage,
+		passwordResets:     passwordResets,
+		emailVerifications: emailVerifications,
+		emailSender:        emailSender,
 	}
 }
 
@@ -77,9 +82,12 @@ type RegisterInput struct {
 	Password string
 	FullName string
 	Role     user.Role
+	// SkipEmailVerification chỉ nên bật ở dev/seed (cùng điều kiện với
+	// AllowRoleOnRegister) — tài khoản được active ngay, bỏ qua OTP US1.9.
+	SkipEmailVerification bool
 }
 
-// Register hiện thực US1.1.
+// Register hiện thực US1.1 + US1.9 (xác thực email qua OTP trước khi active).
 func (s *Service) Register(ctx context.Context, in RegisterInput) (*user.User, error) {
 	existing, err := s.users.FindByEmail(ctx, in.Email)
 	if err != nil && !errors.Is(err, user.ErrNotFound) {
@@ -100,10 +108,85 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (*user.User, e
 	if err := u.SetPasswordHash(hash); err != nil {
 		return nil, err
 	}
+	if in.SkipEmailVerification {
+		u.MarkEmailVerified()
+	}
 	if err := s.users.Create(ctx, u); err != nil {
 		return nil, err
 	}
+	if !in.SkipEmailVerification {
+		if err := s.sendVerificationOTP(ctx, u); err != nil {
+			return nil, err
+		}
+	}
 	return u, nil
+}
+
+// VerifyEmail hiện thực US1.9: xác thực OTP gửi lúc đăng ký rồi active tài
+// khoản. Idempotent — gọi lại khi đã xác thực rồi thì trả nil, không lỗi.
+func (s *Service) VerifyEmail(ctx context.Context, email, otp string) error {
+	u, err := s.users.FindByEmail(ctx, email)
+	if err != nil {
+		return emailverification.ErrInvalidOTP // không tiết lộ email có tồn tại hay không
+	}
+	if u.EmailVerified() {
+		return nil
+	}
+
+	v, err := s.emailVerifications.FindActiveByUser(ctx, u.ID())
+	if err != nil {
+		return emailverification.ErrInvalidOTP
+	}
+
+	verifyErr := v.Verify(otp, s.hasher)
+	if updateErr := s.emailVerifications.Update(ctx, v); updateErr != nil {
+		return updateErr
+	}
+	if verifyErr != nil {
+		return verifyErr
+	}
+
+	u.MarkEmailVerified()
+	return s.users.Update(ctx, u)
+}
+
+// ResendVerification hiện thực US1.9: gửi lại OTP xác thực email (vd. mail
+// gốc bị mất/hết hạn). Luôn trả nil dù email không tồn tại hoặc đã xác thực
+// rồi — không tiết lộ tài khoản (chống dò email), trừ khi lỗi hệ thống thật.
+func (s *Service) ResendVerification(ctx context.Context, email string) error {
+	u, err := s.users.FindByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, user.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+	if u.EmailVerified() {
+		return nil
+	}
+	return s.sendVerificationOTP(ctx, u)
+}
+
+// sendVerificationOTP sinh OTP mới, lưu (đã hash) và gửi qua email — dùng
+// chung cho Register và ResendVerification.
+func (s *Service) sendVerificationOTP(ctx context.Context, u *user.User) error {
+	otp, err := generateOTP()
+	if err != nil {
+		return err
+	}
+	otpHash, err := s.hasher.Hash(otp)
+	if err != nil {
+		return err
+	}
+	v := emailverification.New(u.ID(), otpHash, otpTTL)
+	if err := s.emailVerifications.Create(ctx, v); err != nil {
+		return err
+	}
+	body := fmt.Sprintf(
+		"Mã OTP xác thực email đăng ký EduConnect LMS của bạn là: %s\nMã có hiệu lực trong 10 phút.",
+		otp,
+	)
+	return s.emailSender.Send(ctx, u.Email(), "EduConnect LMS - Xác thực email đăng ký", body)
 }
 
 type LoginInput struct {

@@ -32,6 +32,7 @@ var (
 	ErrInactive          = errors.New("user: tài khoản đã bị khoá")
 	ErrNotFound          = errors.New("user: không tìm thấy")
 	ErrInvalidPhone      = errors.New("user: số điện thoại không hợp lệ")
+	ErrEmailNotVerified  = errors.New("user: email chưa được xác thực")
 )
 
 var emailPattern = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
@@ -43,21 +44,25 @@ var phonePattern = regexp.MustCompile(`^(0\d{9}|\+84\d{9})$`)
 // Các field để private: mọi thay đổi trạng thái phải đi qua behavior method
 // để invariant không bao giờ bị bypass từ tầng ngoài.
 type User struct {
-	id           uint
-	email        string
-	passwordHash string
-	fullName     string
-	role         Role
-	active       bool
-	phone        string
-	studentCode  string // MSSV (học viên) hoặc mã giảng viên
-	avatarPath   string
-	createdAt    time.Time
-	updatedAt    time.Time
+	id            uint
+	email         string
+	passwordHash  string
+	fullName      string
+	role          Role
+	active        bool
+	emailVerified bool
+	phone         string
+	studentCode   string // MSSV (học viên) hoặc mã giảng viên
+	avatarPath    string
+	createdAt     time.Time
+	updatedAt     time.Time
 }
 
 // NewUser tạo mới một tài khoản (US1.1). Password hash được set riêng
 // qua SetPasswordHash để domain không phụ thuộc trực tiếp vào thư viện hash cụ thể.
+// emailVerified mặc định false: tài khoản mới phải xác thực OTP gửi qua email
+// (US1.9) trước khi CanLogin() cho phép đăng nhập — trừ khi service chủ động
+// gọi MarkEmailVerified() ngay (dùng cho dev/seed, xem ALLOW_ROLE_ON_REGISTER).
 func NewUser(email, fullName string, role Role) (*User, error) {
 	if !emailPattern.MatchString(email) {
 		return nil, ErrInvalidEmail
@@ -70,31 +75,33 @@ func NewUser(email, fullName string, role Role) (*User, error) {
 	}
 	now := time.Now().UTC()
 	return &User{
-		email:     email,
-		fullName:  fullName,
-		role:      role,
-		active:    true,
-		createdAt: now,
-		updatedAt: now,
+		email:         email,
+		fullName:      fullName,
+		role:          role,
+		active:        true,
+		emailVerified: false,
+		createdAt:     now,
+		updatedAt:     now,
 	}, nil
 }
 
 // Rehydrate dựng lại 1 User từ dữ liệu đã lưu trong DB. Hàm này tin tưởng
 // tầng lưu trữ (dữ liệu đã hợp lệ từ lúc ghi xuống), chỉ nên gọi từ
 // các repository implementation.
-func Rehydrate(id uint, email, passwordHash, fullName string, role Role, active bool, phone, studentCode, avatarPath string, createdAt, updatedAt time.Time) *User {
+func Rehydrate(id uint, email, passwordHash, fullName string, role Role, active, emailVerified bool, phone, studentCode, avatarPath string, createdAt, updatedAt time.Time) *User {
 	return &User{
-		id:           id,
-		email:        email,
-		passwordHash: passwordHash,
-		fullName:     fullName,
-		role:         role,
-		active:       active,
-		phone:        phone,
-		studentCode:  studentCode,
-		avatarPath:   avatarPath,
-		createdAt:    createdAt,
-		updatedAt:    updatedAt,
+		id:            id,
+		email:         email,
+		passwordHash:  passwordHash,
+		fullName:      fullName,
+		role:          role,
+		active:        active,
+		emailVerified: emailVerified,
+		phone:         phone,
+		studentCode:   studentCode,
+		avatarPath:    avatarPath,
+		createdAt:     createdAt,
+		updatedAt:     updatedAt,
 	}
 }
 
@@ -149,10 +156,22 @@ func (u *User) Activate() {
 	u.updatedAt = time.Now().UTC()
 }
 
-// CanLogin đảm bảo invariant "tài khoản phải active mới login được", dùng bởi auth service (US1.2).
+// MarkEmailVerified hiện thực US1.9: xác nhận chủ tài khoản thực sự sở hữu
+// email đã đăng ký (qua OTP), tách biệt hoàn toàn với active (US1.3 — admin
+// khoá/mở tài khoản) vì đây là 2 lý do chặn đăng nhập khác nhau.
+func (u *User) MarkEmailVerified() {
+	u.emailVerified = true
+	u.updatedAt = time.Now().UTC()
+}
+
+// CanLogin đảm bảo 2 invariant độc lập trước khi cho đăng nhập: tài khoản
+// không bị khoá (US1.3) và email đã xác thực (US1.9).
 func (u *User) CanLogin() error {
 	if !u.active {
 		return ErrInactive
+	}
+	if !u.emailVerified {
+		return ErrEmailNotVerified
 	}
 	return nil
 }
@@ -165,6 +184,7 @@ func (u *User) PasswordHash() string { return u.passwordHash }
 func (u *User) FullName() string     { return u.fullName }
 func (u *User) Role() Role           { return u.role }
 func (u *User) Active() bool         { return u.active }
+func (u *User) EmailVerified() bool  { return u.emailVerified }
 func (u *User) Phone() string        { return u.phone }
 func (u *User) StudentCode() string  { return u.studentCode }
 func (u *User) AvatarPath() string   { return u.avatarPath }

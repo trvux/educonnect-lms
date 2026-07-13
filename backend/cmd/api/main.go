@@ -65,6 +65,7 @@ func main() {
 	progressRepo := postgres.NewProgressRepository(pool)
 	reportRepo := postgres.NewReportRepository(pool)
 	passwordResetRepo := postgres.NewPasswordResetRepository(pool)
+	emailVerificationRepo := postgres.NewEmailVerificationRepository(pool)
 	roleUpgradeRepo := postgres.NewRoleUpgradeRepository(pool)
 	hasher := security.NewBcryptHasher()
 	tokens := security.NewJWTIssuer(cfg.JWTSecret, 24*time.Hour)
@@ -75,7 +76,7 @@ func main() {
 	emailSender := email.NewSMTPSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPFrom)
 
 	// tầng service (application)
-	authSvc := authservice.NewService(userRepo, hasher, tokens, fileStorage, passwordResetRepo, emailSender)
+	authSvc := authservice.NewService(userRepo, hasher, tokens, fileStorage, passwordResetRepo, emailVerificationRepo, emailSender)
 	roleUpgradeSvc := roleupgradeservice.NewService(roleUpgradeRepo, userRepo)
 	courseSvc := courseservice.NewService(courseRepo)
 	curriculumSvc := curriculumservice.NewService(chapterRepo, lessonRepo)

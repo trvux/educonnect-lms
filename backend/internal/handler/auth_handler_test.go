@@ -51,6 +51,14 @@ func (f *fakeAuthService) ForgotUsername(_ context.Context, _ string) (string, e
 	return "", user.ErrNotFound
 }
 
+func (f *fakeAuthService) VerifyEmail(_ context.Context, _, _ string) error {
+	return nil
+}
+
+func (f *fakeAuthService) ResendVerification(_ context.Context, _ string) error {
+	return nil
+}
+
 func TestAuthHandler_Register_Success(t *testing.T) {
 	svc := &fakeAuthService{
 		registerFn: func(_ context.Context, in auth.RegisterInput) (*user.User, error) {
@@ -76,9 +84,11 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 
 func TestAuthHandler_Register_ForcesStudent_WhenRoleOverrideDisabled(t *testing.T) {
 	var gotRole user.Role
+	var gotSkip bool
 	svc := &fakeAuthService{
 		registerFn: func(_ context.Context, in auth.RegisterInput) (*user.User, error) {
 			gotRole = in.Role
+			gotSkip = in.SkipEmailVerification
 			u, err := user.NewUser(in.Email, in.FullName, in.Role)
 			require.NoError(t, err)
 			u.SetID(1)
@@ -97,13 +107,16 @@ func TestAuthHandler_Register_ForcesStudent_WhenRoleOverrideDisabled(t *testing.
 
 	assert.Equal(t, http.StatusCreated, rec.Code)
 	assert.Equal(t, user.RoleStudent, gotRole, "role client gửi lên phải bị bỏ qua khi flag tắt")
+	assert.False(t, gotSkip, "production phải bắt buộc xác thực email (US1.9)")
 }
 
 func TestAuthHandler_Register_HonorsRole_WhenOverrideEnabled(t *testing.T) {
 	var gotRole user.Role
+	var gotSkip bool
 	svc := &fakeAuthService{
 		registerFn: func(_ context.Context, in auth.RegisterInput) (*user.User, error) {
 			gotRole = in.Role
+			gotSkip = in.SkipEmailVerification
 			u, err := user.NewUser(in.Email, in.FullName, in.Role)
 			require.NoError(t, err)
 			u.SetID(1)
@@ -122,6 +135,7 @@ func TestAuthHandler_Register_HonorsRole_WhenOverrideEnabled(t *testing.T) {
 
 	assert.Equal(t, http.StatusCreated, rec.Code)
 	assert.Equal(t, user.RoleTeacher, gotRole)
+	assert.True(t, gotSkip, "dev/seed phải bỏ qua OTP xác thực email")
 }
 
 func TestAuthHandler_Register_EmailTaken(t *testing.T) {

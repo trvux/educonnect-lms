@@ -55,9 +55,9 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<"div"
       });
       return res.data;
     },
-    onSuccess: () => {
-      toast.success("Đăng ký thành công, mời đăng nhập");
-      router.push("/login");
+    onSuccess: (_data, values) => {
+      toast.success("Đăng ký thành công, kiểm tra email để lấy mã OTP xác thực");
+      router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
     },
     onError: (error: unknown) => {
       const message =

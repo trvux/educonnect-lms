@@ -67,11 +67,13 @@ func New(deps Deps) http.Handler {
 
 	r.Route("/api", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
-			r.Post("/register", deps.AuthHandler.Register)               // US1.1
-			r.Post("/login", deps.AuthHandler.Login)                     // US1.2
-			r.Post("/forgot-username", deps.AuthHandler.ForgotUsername)  // US1.8, public
-			r.Post("/forgot-password", deps.PasswordResetHandler.Forgot) // US1.6, public
-			r.Post("/reset-password", deps.PasswordResetHandler.Reset)   // US1.6, public
+			r.Post("/register", deps.AuthHandler.Register)                      // US1.1
+			r.Post("/login", deps.AuthHandler.Login)                            // US1.2
+			r.Post("/verify-email", deps.AuthHandler.VerifyEmail)               // US1.9, public
+			r.Post("/resend-verification", deps.AuthHandler.ResendVerification) // US1.9, public
+			r.Post("/forgot-username", deps.AuthHandler.ForgotUsername)         // US1.8, public
+			r.Post("/forgot-password", deps.PasswordResetHandler.Forgot)        // US1.6, public
+			r.Post("/reset-password", deps.PasswordResetHandler.Reset)          // US1.6, public
 		})
 
 		r.Get("/courses", deps.CourseHandler.Search)                               // US3.1, public

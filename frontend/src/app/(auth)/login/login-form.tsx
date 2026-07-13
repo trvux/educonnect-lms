@@ -54,7 +54,14 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
       toast.success("Đăng nhập thành công");
       router.push("/courses");
     },
-    onError: () => {
+    onError: (error: unknown, values) => {
+      // 428: US1.9 — tài khoản chưa xác thực OTP email, khác 401 sai mật khẩu.
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status === 428) {
+        toast.error("Tài khoản chưa xác thực email, vui lòng nhập mã OTP");
+        router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
+        return;
+      }
       toast.error("Email hoặc mật khẩu không đúng");
     },
   });

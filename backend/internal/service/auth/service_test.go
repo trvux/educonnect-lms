@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"educonnect-lms/backend/internal/domain/emailverification"
 	"educonnect-lms/backend/internal/domain/passwordreset"
 	"educonnect-lms/backend/internal/domain/user"
 	"educonnect-lms/backend/internal/service/auth"
@@ -119,6 +120,35 @@ func (r *fakePasswordResetRepo) Update(_ context.Context, reset *passwordreset.R
 	return nil
 }
 
+// fakeEmailVerificationRepo is an in-memory stand-in for emailverification.Repository.
+type fakeEmailVerificationRepo struct {
+	byUser map[uint]*emailverification.Verification
+	nextID uint
+}
+
+func newFakeEmailVerificationRepo() *fakeEmailVerificationRepo {
+	return &fakeEmailVerificationRepo{byUser: map[uint]*emailverification.Verification{}}
+}
+
+func (r *fakeEmailVerificationRepo) Create(_ context.Context, v *emailverification.Verification) error {
+	r.nextID++
+	v.SetID(r.nextID)
+	r.byUser[v.UserID()] = v
+	return nil
+}
+
+func (r *fakeEmailVerificationRepo) FindActiveByUser(_ context.Context, userID uint) (*emailverification.Verification, error) {
+	if v, ok := r.byUser[userID]; ok {
+		return v, nil
+	}
+	return nil, emailverification.ErrNotFound
+}
+
+func (r *fakeEmailVerificationRepo) Update(_ context.Context, v *emailverification.Verification) error {
+	r.byUser[v.UserID()] = v
+	return nil
+}
+
 // fakeEmailSender captures the last email "sent" so tests can assert on it
 // without touching a real SMTP server.
 type fakeEmailSender struct {
@@ -133,14 +163,20 @@ func (s *fakeEmailSender) Send(_ context.Context, to, subject, body string) erro
 }
 
 func newService() *auth.Service {
-	return auth.NewService(newFakeUserRepo(), fakeHasher{}, fakeTokenIssuer{}, &fakeStorage{}, newFakePasswordResetRepo(), &fakeEmailSender{})
+	return auth.NewService(
+		newFakeUserRepo(), fakeHasher{}, fakeTokenIssuer{}, &fakeStorage{},
+		newFakePasswordResetRepo(), newFakeEmailVerificationRepo(), &fakeEmailSender{},
+	)
 }
 
 // newServiceForOTP trả thêm repo/mailer giả để test kiểm tra được nội dung
 // OTP thật sự đã gửi (đọc từ email giả, không đoán mò).
 func newServiceForOTP() (*auth.Service, *fakeEmailSender) {
 	mailer := &fakeEmailSender{}
-	svc := auth.NewService(newFakeUserRepo(), fakeHasher{}, fakeTokenIssuer{}, &fakeStorage{}, newFakePasswordResetRepo(), mailer)
+	svc := auth.NewService(
+		newFakeUserRepo(), fakeHasher{}, fakeTokenIssuer{}, &fakeStorage{},
+		newFakePasswordResetRepo(), newFakeEmailVerificationRepo(), mailer,
+	)
 	return svc, mailer
 }
 
@@ -149,10 +185,11 @@ func TestService_Register(t *testing.T) {
 	ctx := context.Background()
 
 	u, err := s.Register(ctx, auth.RegisterInput{
-		Email:    "huy@vlu.edu.vn",
-		Password: "secret123",
-		FullName: "Huynh Bao Huy",
-		Role:     user.RoleStudent,
+		Email:                 "huy@vlu.edu.vn",
+		Password:              "secret123",
+		FullName:              "Huynh Bao Huy",
+		Role:                  user.RoleStudent,
+		SkipEmailVerification: true,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "huy@vlu.edu.vn", u.Email())
@@ -174,6 +211,7 @@ func TestService_GetProfile(t *testing.T) {
 
 	registered, err := s.Register(ctx, auth.RegisterInput{
 		Email: "huy@vlu.edu.vn", Password: "secret123", FullName: "Huy", Role: user.RoleStudent,
+		SkipEmailVerification: true,
 	})
 	require.NoError(t, err)
 
@@ -188,6 +226,7 @@ func TestService_UpdateProfile(t *testing.T) {
 
 	registered, err := s.Register(ctx, auth.RegisterInput{
 		Email: "huy@vlu.edu.vn", Password: "secret123", FullName: "Huy", Role: user.RoleStudent,
+		SkipEmailVerification: true,
 	})
 	require.NoError(t, err)
 
@@ -206,6 +245,7 @@ func TestService_ChangePassword(t *testing.T) {
 
 	registered, err := s.Register(ctx, auth.RegisterInput{
 		Email: "huy@vlu.edu.vn", Password: "secret123", FullName: "Huy", Role: user.RoleStudent,
+		SkipEmailVerification: true,
 	})
 	require.NoError(t, err)
 
@@ -225,6 +265,7 @@ func TestService_UploadAvatar(t *testing.T) {
 
 	registered, err := s.Register(ctx, auth.RegisterInput{
 		Email: "huy@vlu.edu.vn", Password: "secret123", FullName: "Huy", Role: user.RoleStudent,
+		SkipEmailVerification: true,
 	})
 	require.NoError(t, err)
 
@@ -239,6 +280,7 @@ func TestService_ForgotUsername(t *testing.T) {
 
 	registered, err := s.Register(ctx, auth.RegisterInput{
 		Email: "huy@vlu.edu.vn", Password: "secret123", FullName: "Huy", Role: user.RoleStudent,
+		SkipEmailVerification: true,
 	})
 	require.NoError(t, err)
 	_, err = s.UpdateProfile(ctx, registered.ID(), "Huy", "0987654321", "")
@@ -258,6 +300,7 @@ func TestService_ForgotAndResetPassword(t *testing.T) {
 
 	registered, err := s.Register(ctx, auth.RegisterInput{
 		Email: "huy@vlu.edu.vn", Password: "secret123", FullName: "Huy", Role: user.RoleStudent,
+		SkipEmailVerification: true,
 	})
 	require.NoError(t, err)
 
@@ -290,6 +333,81 @@ func TestService_ForgotPassword_UnknownEmail_DoesNotLeak(t *testing.T) {
 	assert.Empty(t, mailer.lastTo, "không được gửi mail cho email không tồn tại")
 }
 
+func TestService_Register_RequiresEmailVerification(t *testing.T) {
+	s, mailer := newServiceForOTP()
+	ctx := context.Background()
+
+	registered, err := s.Register(ctx, auth.RegisterInput{
+		Email: "huy@vlu.edu.vn", Password: "secret123", FullName: "Huy", Role: user.RoleStudent,
+	})
+	require.NoError(t, err)
+	assert.False(t, registered.EmailVerified(), "tài khoản mới đăng ký phải chưa xác thực email")
+	require.NotEmpty(t, mailer.lastBody, "phải gửi OTP xác thực ngay khi đăng ký")
+	assert.Equal(t, "huy@vlu.edu.vn", mailer.lastTo)
+
+	_, err = s.Login(ctx, auth.LoginInput{Email: "huy@vlu.edu.vn", Password: "secret123"})
+	assert.ErrorIs(t, err, user.ErrEmailNotVerified, "chưa xác thực email thì chưa được đăng nhập")
+
+	otp := extractOTP(t, mailer.lastBody)
+	require.NoError(t, s.VerifyEmail(ctx, "huy@vlu.edu.vn", otp))
+
+	token, err := s.Login(ctx, auth.LoginInput{Email: "huy@vlu.edu.vn", Password: "secret123"})
+	require.NoError(t, err)
+	assert.Equal(t, "token-for-user", token)
+
+	// Verify lại lần 2 (vd double-submit) phải idempotent, không lỗi.
+	require.NoError(t, s.VerifyEmail(ctx, "huy@vlu.edu.vn", otp))
+}
+
+func TestService_VerifyEmail_WrongOTP(t *testing.T) {
+	s, mailer := newServiceForOTP()
+	ctx := context.Background()
+
+	_, err := s.Register(ctx, auth.RegisterInput{
+		Email: "huy@vlu.edu.vn", Password: "secret123", FullName: "Huy", Role: user.RoleStudent,
+	})
+	require.NoError(t, err)
+
+	otp := extractOTP(t, mailer.lastBody)
+	wrong := "000000"
+	if wrong == otp {
+		wrong = "111111"
+	}
+	err = s.VerifyEmail(ctx, "huy@vlu.edu.vn", wrong)
+	assert.ErrorIs(t, err, emailverification.ErrInvalidOTP)
+
+	_, err = s.Login(ctx, auth.LoginInput{Email: "huy@vlu.edu.vn", Password: "secret123"})
+	assert.ErrorIs(t, err, user.ErrEmailNotVerified)
+}
+
+func TestService_ResendVerification(t *testing.T) {
+	s, mailer := newServiceForOTP()
+	ctx := context.Background()
+
+	_, err := s.Register(ctx, auth.RegisterInput{
+		Email: "huy@vlu.edu.vn", Password: "secret123", FullName: "Huy", Role: user.RoleStudent,
+	})
+	require.NoError(t, err)
+	firstOTP := extractOTP(t, mailer.lastBody)
+
+	require.NoError(t, s.ResendVerification(ctx, "huy@vlu.edu.vn"))
+	secondOTP := extractOTP(t, mailer.lastBody)
+
+	require.NoError(t, s.VerifyEmail(ctx, "huy@vlu.edu.vn", secondOTP))
+	_ = firstOTP
+
+	_, err = s.Login(ctx, auth.LoginInput{Email: "huy@vlu.edu.vn", Password: "secret123"})
+	require.NoError(t, err)
+}
+
+func TestService_ResendVerification_UnknownEmail_DoesNotLeak(t *testing.T) {
+	s, mailer := newServiceForOTP()
+
+	err := s.ResendVerification(context.Background(), "nobody@vlu.edu.vn")
+	require.NoError(t, err, "không được lộ thông tin email có tồn tại hay không")
+	assert.Empty(t, mailer.lastTo, "không được gửi mail cho email không tồn tại")
+}
+
 func extractOTP(t *testing.T, body string) string {
 	t.Helper()
 	re := regexp.MustCompile(`\d{6}`)
@@ -304,6 +422,7 @@ func TestService_Login(t *testing.T) {
 
 	_, err := s.Register(ctx, auth.RegisterInput{
 		Email: "huy@vlu.edu.vn", Password: "secret123", FullName: "Huy", Role: user.RoleStudent,
+		SkipEmailVerification: true,
 	})
 	require.NoError(t, err)
 

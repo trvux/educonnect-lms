@@ -6,7 +6,7 @@ import { useSession, clearToken } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/notification-bell";
 
-const HIDDEN_ON = ["/login", "/register", "/forgot-password", "/forgot-username"];
+const HIDDEN_ON = ["/login", "/register", "/forgot-password", "/forgot-username", "/verify-email"];
 
 export function Navbar() {
   const session = useSession();

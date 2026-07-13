@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 
+	"educonnect-lms/backend/internal/domain/emailverification"
 	"educonnect-lms/backend/internal/domain/user"
 	"educonnect-lms/backend/internal/handler/middleware"
 	"educonnect-lms/backend/internal/service/auth"
@@ -26,6 +27,8 @@ type AuthService interface {
 	ChangePassword(ctx context.Context, userID uint, currentPassword, newPassword string) error
 	UploadAvatar(ctx context.Context, userID uint, fileName string, content io.Reader) (*user.User, error)
 	ForgotUsername(ctx context.Context, phone string) (string, error)
+	VerifyEmail(ctx context.Context, email, otp string) error
+	ResendVerification(ctx context.Context, email string) error
 }
 
 type AuthHandler struct {
@@ -50,28 +53,30 @@ type registerRequest struct {
 }
 
 type userResponse struct {
-	ID          uint   `json:"id"`
-	Email       string `json:"email"`
-	FullName    string `json:"full_name"`
-	Role        string `json:"role"`
-	Phone       string `json:"phone,omitempty"`
-	StudentCode string `json:"student_code,omitempty"`
-	AvatarPath  string `json:"avatar_path,omitempty"`
+	ID            uint   `json:"id"`
+	Email         string `json:"email"`
+	FullName      string `json:"full_name"`
+	Role          string `json:"role"`
+	Phone         string `json:"phone,omitempty"`
+	StudentCode   string `json:"student_code,omitempty"`
+	AvatarPath    string `json:"avatar_path,omitempty"`
+	EmailVerified bool   `json:"email_verified"`
 }
 
 func toUserResponse(u *user.User) userResponse {
 	return userResponse{
-		ID:          u.ID(),
-		Email:       u.Email(),
-		FullName:    u.FullName(),
-		Role:        string(u.Role()),
-		Phone:       u.Phone(),
-		StudentCode: u.StudentCode(),
-		AvatarPath:  u.AvatarPath(),
+		ID:            u.ID(),
+		Email:         u.Email(),
+		FullName:      u.FullName(),
+		Role:          string(u.Role()),
+		Phone:         u.Phone(),
+		StudentCode:   u.StudentCode(),
+		AvatarPath:    u.AvatarPath(),
+		EmailVerified: u.EmailVerified(),
 	}
 }
 
-// Register xử lý POST /api/auth/register (US1.1, sửa theo US1.7).
+// Register xử lý POST /api/auth/register (US1.1, sửa theo US1.7/US1.9).
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -89,6 +94,9 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		Password: req.Password,
 		FullName: req.FullName,
 		Role:     role,
+		// Dev/seed (cùng flag AllowRoleOnRegister) bỏ qua OTP xác thực email
+		// để script seed và test thủ công không cần đọc mail thật.
+		SkipEmailVerification: h.allowRoleOnRegister,
 	})
 	if err != nil {
 		h.handleAuthError(w, err)
@@ -96,6 +104,54 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, toUserResponse(u))
+}
+
+type verifyEmailRequest struct {
+	Email string `json:"email"`
+	OTP   string `json:"otp"`
+}
+
+// VerifyEmail xử lý POST /api/auth/verify-email (US1.9, public).
+func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	var req verifyEmailRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "dữ liệu gửi lên không đúng định dạng JSON")
+		return
+	}
+	if err := h.service.VerifyEmail(r.Context(), req.Email, req.OTP); err != nil {
+		switch {
+		case errors.Is(err, emailverification.ErrInvalidOTP):
+			writeError(w, http.StatusBadRequest, err.Error())
+		case errors.Is(err, emailverification.ErrTooManyAttempts):
+			writeError(w, http.StatusTooManyRequests, err.Error())
+		default:
+			h.log.Error("auth handler: xác thực email thất bại", zap.Error(err))
+			writeError(w, http.StatusInternalServerError, "lỗi hệ thống, vui lòng thử lại sau")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, nil)
+}
+
+type resendVerificationRequest struct {
+	Email string `json:"email"`
+}
+
+// ResendVerification xử lý POST /api/auth/resend-verification (US1.9, public).
+func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request) {
+	var req resendVerificationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "dữ liệu gửi lên không đúng định dạng JSON")
+		return
+	}
+	if err := h.service.ResendVerification(r.Context(), req.Email); err != nil {
+		h.log.Error("auth handler: gửi lại OTP xác thực thất bại", zap.Error(err))
+		writeError(w, http.StatusInternalServerError, "lỗi hệ thống, vui lòng thử lại sau")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "Nếu email tồn tại và chưa xác thực, mã OTP đã được gửi.",
+	})
 }
 
 type loginRequest struct {
@@ -250,6 +306,10 @@ func (h *AuthHandler) handleAuthError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusUnauthorized, err.Error())
 	case errors.Is(err, user.ErrInactive):
 		writeError(w, http.StatusForbidden, err.Error())
+	case errors.Is(err, user.ErrEmailNotVerified):
+		// 428 (không phải 403) để FE phân biệt được "chưa xác thực email"
+		// (có thể tự khắc phục bằng cách verify) với "tài khoản bị khoá".
+		writeError(w, http.StatusPreconditionRequired, err.Error())
 	case errors.Is(err, user.ErrNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, user.ErrInvalidEmail),

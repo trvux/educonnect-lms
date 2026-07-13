@@ -121,6 +121,7 @@ export type UserProfile = {
   phone?: string;
   student_code?: string;
   avatar_path?: string;
+  email_verified: boolean;
 };
 
 export type RoleUpgradeStatus = "pending" | "approved" | "rejected";

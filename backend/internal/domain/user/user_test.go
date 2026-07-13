@@ -82,6 +82,7 @@ func TestUser_SetAvatarPath(t *testing.T) {
 func TestUser_DeactivateBlocksLogin(t *testing.T) {
 	u, err := user.NewUser("huy@vlu.edu.vn", "Huy", user.RoleStudent)
 	require.NoError(t, err)
+	u.MarkEmailVerified() // giả lập đã xác thực email, chỉ test riêng phần active
 
 	require.NoError(t, u.CanLogin())
 
@@ -89,5 +90,17 @@ func TestUser_DeactivateBlocksLogin(t *testing.T) {
 	assert.ErrorIs(t, u.CanLogin(), user.ErrInactive)
 
 	u.Activate()
+	assert.NoError(t, u.CanLogin())
+}
+
+func TestUser_EmailNotVerifiedBlocksLogin(t *testing.T) {
+	u, err := user.NewUser("huy@vlu.edu.vn", "Huy", user.RoleStudent)
+	require.NoError(t, err)
+
+	assert.False(t, u.EmailVerified(), "tài khoản mới phải chưa xác thực email")
+	assert.ErrorIs(t, u.CanLogin(), user.ErrEmailNotVerified)
+
+	u.MarkEmailVerified()
+	assert.True(t, u.EmailVerified())
 	assert.NoError(t, u.CanLogin())
 }
