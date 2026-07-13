@@ -18,6 +18,7 @@ import (
 	courseservice "educonnect-lms/backend/internal/service/course"
 	curriculumservice "educonnect-lms/backend/internal/service/curriculum"
 	enrollmentservice "educonnect-lms/backend/internal/service/enrollment"
+	forumservice "educonnect-lms/backend/internal/service/forum"
 	gradebookservice "educonnect-lms/backend/internal/service/gradebook"
 	materialservice "educonnect-lms/backend/internal/service/material"
 	submissionservice "educonnect-lms/backend/internal/service/submission"
@@ -54,6 +55,7 @@ func main() {
 	assignmentRepo := postgres.NewAssignmentRepository(pool)
 	submissionRepo := postgres.NewSubmissionRepository(pool)
 	gradebookRepo := postgres.NewGradebookRepository(pool)
+	forumRepo := postgres.NewForumRepository(pool)
 	hasher := security.NewBcryptHasher()
 	tokens := security.NewJWTIssuer(cfg.JWTSecret, 24*time.Hour)
 	fileStorage, err := storage.NewLocalFileStorage("uploads")
@@ -70,6 +72,7 @@ func main() {
 	assignmentSvc := assignmentservice.NewService(assignmentRepo, lessonRepo)
 	submissionSvc := submissionservice.NewService(submissionRepo, assignmentSvc, lessonRepo, chapterRepo, courseRepo)
 	gradebookSvc := gradebookservice.NewService(gradebookRepo)
+	forumSvc := forumservice.NewService(forumRepo, courseRepo)
 
 	// tầng HTTP
 	authHandler := handler.NewAuthHandler(authSvc, log)
@@ -80,6 +83,7 @@ func main() {
 	assignmentHandler := handler.NewAssignmentHandler(assignmentSvc, log)
 	submissionHandler := handler.NewSubmissionHandler(submissionSvc, log)
 	gradebookHandler := handler.NewGradebookHandler(gradebookSvc, courseSvc, log)
+	forumHandler := handler.NewForumHandler(forumSvc, log)
 
 	r := router.New(router.Deps{
 		AuthHandler:       authHandler,
@@ -90,6 +94,7 @@ func main() {
 		AssignmentHandler: assignmentHandler,
 		SubmissionHandler: submissionHandler,
 		GradebookHandler:  gradebookHandler,
+		ForumHandler:      forumHandler,
 		TokenVerifier:     tokens,
 		UploadsDir:        "uploads",
 	})
