@@ -20,13 +20,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Form,
   FormControl,
   FormField,
@@ -35,13 +28,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 
-// US1.1: đăng ký tài khoản và chọn vai trò (Học viên/Giảng viên). Quản trị
-// viên (admin) không tự đăng ký qua form công khai này.
+// US1.1/US1.7: đăng ký công khai luôn tạo tài khoản Học viên. Muốn trở
+// thành Giảng viên phải gửi yêu cầu trong trang Hồ sơ để quản trị viên duyệt
+// (backend cũng ép Student bất kể client gửi gì — xem AllowRoleOnRegister).
 const registerSchema = z.object({
   fullName: z.string().min(2, "Họ tên phải có ít nhất 2 ký tự"),
   email: z.string().min(1, "Vui lòng nhập email").email("Email không hợp lệ"),
   password: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự"),
-  role: z.enum(["student", "teacher"], { message: "Vui lòng chọn vai trò" }),
 });
 
 type RegisterValues = z.infer<typeof registerSchema>;
@@ -50,7 +43,7 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<"div"
   const router = useRouter();
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { fullName: "", email: "", password: "", role: "student" },
+    defaultValues: { fullName: "", email: "", password: "" },
   });
 
   const mutation = useMutation({
@@ -59,7 +52,6 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<"div"
         full_name: values.fullName,
         email: values.email,
         password: values.password,
-        role: values.role,
       });
       return res.data;
     },
@@ -80,7 +72,10 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<"div"
       <Card>
         <CardHeader>
           <CardTitle>Tạo tài khoản EduConnect LMS</CardTitle>
-          <CardDescription>Chọn vai trò Học viên hoặc Giảng viên</CardDescription>
+          <CardDescription>
+            Tài khoản mới là Học viên; muốn trở thành Giảng viên, hãy gửi yêu cầu trong Hồ sơ sau khi
+            đăng nhập
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -123,27 +118,6 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<"div"
                     <FormControl>
                       <Input type="password" {...field} />
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Vai trò</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Chọn vai trò" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="student">Học viên</SelectItem>
-                        <SelectItem value="teacher">Giảng viên</SelectItem>
-                      </SelectContent>
-                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -90,7 +90,15 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mật khẩu</FormLabel>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Mật khẩu</FormLabel>
+                      <Link
+                        href="/forgot-password"
+                        className="text-sm text-muted-foreground underline underline-offset-4"
+                      >
+                        Quên mật khẩu?
+                      </Link>
+                    </div>
                     <FormControl>
                       <Input type="password" {...field} />
                     </FormControl>
@@ -106,6 +114,10 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                   Chưa có tài khoản?{" "}
                   <Link href="/register" className="underline underline-offset-4">
                     Đăng ký
+                  </Link>
+                  {" · "}
+                  <Link href="/forgot-username" className="underline underline-offset-4">
+                    Quên tên đăng nhập
                   </Link>
                 </p>
               </div>

@@ -6,7 +6,7 @@ import { useSession, clearToken } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/notification-bell";
 
-const HIDDEN_ON = ["/login", "/register"];
+const HIDDEN_ON = ["/login", "/register", "/forgot-password", "/forgot-username"];
 
 export function Navbar() {
   const session = useSession();
@@ -56,7 +56,24 @@ export function Navbar() {
             </Button>
           )}
 
+          {session?.role === "admin" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              nativeButton={false}
+              render={<Link href="/admin/role-upgrade-requests" />}
+            >
+              Duyệt nâng cấp
+            </Button>
+          )}
+
           {session && <NotificationBell />}
+
+          {session && (
+            <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/profile" />}>
+              Hồ sơ
+            </Button>
+          )}
 
           {session ? (
             <Button variant="outline" size="sm" onClick={handleLogout}>

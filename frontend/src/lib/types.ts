@@ -111,3 +111,26 @@ export type CourseStats = {
   total_assignments: number;
   average_completion: number;
 };
+
+// Sprint 3 — US1.4/1.5/1.6/1.7/1.8
+export type UserProfile = {
+  id: number;
+  email: string;
+  full_name: string;
+  role: "student" | "teacher" | "admin";
+  phone?: string;
+  student_code?: string;
+  avatar_path?: string;
+};
+
+export type RoleUpgradeStatus = "pending" | "approved" | "rejected";
+
+export type RoleUpgradeRequest = {
+  id: number;
+  user_id: number;
+  reason: string;
+  status: RoleUpgradeStatus;
+  reviewed_by?: number;
+  created_at: string;
+  reviewed_at?: string;
+};
