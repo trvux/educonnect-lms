@@ -55,5 +55,6 @@ func (m *Material) UploadedAt() time.Time { return m.uploadedAt }
 
 type Repository interface {
 	Create(ctx context.Context, m *Material) error
+	FindByID(ctx context.Context, id uint) (*Material, error)
 	ListByLesson(ctx context.Context, lessonID uint) ([]*Material, error)
 }

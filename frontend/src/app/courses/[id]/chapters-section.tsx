@@ -11,7 +11,7 @@ import {
   listLessons,
   createLesson,
 } from "@/lib/api/curriculum";
-import { listMaterials, uploadMaterial, materialDownloadUrl } from "@/lib/api/materials";
+import { listMaterials, uploadMaterial, downloadMaterial } from "@/lib/api/materials";
 import { AssignmentsSection } from "./assignments-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -188,19 +188,24 @@ function MaterialsList({ lessonId, canManage }: { lessonId: number; canManage: b
     onError: () => toast.error("Tải tài liệu lên thất bại"),
   });
 
+  const downloadMutation = useMutation({
+    mutationFn: ({ id, fileName }: { id: number; fileName: string }) => downloadMaterial(id, fileName),
+    onError: () => toast.error("Tải tài liệu thất bại, vui lòng thử lại"),
+  });
+
   return (
     <div className="mt-2 flex flex-col gap-2">
       {materials?.map((m) => (
-        <a
+        <button
           key={m.id}
-          href={materialDownloadUrl(m.file_path)}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-2 text-sm text-primary hover:underline"
+          type="button"
+          onClick={() => downloadMutation.mutate({ id: m.id, fileName: m.file_name })}
+          disabled={downloadMutation.isPending}
+          className="flex w-fit items-center gap-2 text-sm text-primary hover:underline disabled:opacity-50"
         >
           <DownloadIcon className="size-4" />
           {m.file_name}
-        </a>
+        </button>
       ))}
       {materials?.length === 0 && (
         <p className="text-sm text-muted-foreground">Chưa có tài liệu.</p>

@@ -15,12 +15,20 @@ export async function uploadMaterial(lessonId: number, file: File) {
   return res.data;
 }
 
-// Backend lưu file_path tương đối (vd "lesson-1/slide.pdf"); ghép với gốc
-// API để có URL tải file thật (route static file phục vụ ở backend sau).
-export function materialDownloadUrl(filePath: string) {
-  const base = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api").replace(
-    /\/api\/?$/,
-    ""
-  );
-  return `${base}/uploads/${filePath}`;
+// US4.3 — tài liệu không còn phục vụ qua link tĩnh công khai (lỗ hổng bảo
+// mật cũ: ai có link cũng tải được, không cần đăng nhập/đăng ký khóa học).
+// Endpoint /materials/:id/download giờ yêu cầu Authorization header, nên
+// không thể dùng thẻ <a href=...> trực tiếp (không tự gắn header, và
+// thuộc tính `download` bị trình duyệt bỏ qua với link cross-origin) — phải
+// fetch qua axios (đã tự gắn Bearer token) rồi tự tạo Blob URL để tải.
+export async function downloadMaterial(materialId: number, fileName: string) {
+  const res = await apiClient.get(`/materials/${materialId}/download`, { responseType: "blob" });
+  const blobUrl = URL.createObjectURL(res.data as Blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(blobUrl);
 }

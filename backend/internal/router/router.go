@@ -57,13 +57,17 @@ func New(deps Deps) http.Handler {
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// Phục vụ file tĩnh đã upload (US4.1) để frontend tải xuống (US4.2).
+	// US4.3: chỉ avatar (ảnh đại diện, không nhạy cảm) được phục vụ tĩnh
+	// công khai. Tài liệu bài giảng KHÔNG còn serve qua /uploads/* nữa — lỗ
+	// hổng bảo mật trước đây (ai có link cũng tải được, không cần đăng
+	// nhập/đăng ký khóa học) đã được vá bằng cách bắt buộc đi qua endpoint
+	// có kiểm tra quyền GET /api/materials/{id}/download bên dưới.
 	uploadsDir := deps.UploadsDir
 	if uploadsDir == "" {
 		uploadsDir = "uploads"
 	}
-	fileServer := http.StripPrefix("/uploads/", http.FileServer(http.Dir(uploadsDir)))
-	r.Handle("/uploads/*", fileServer)
+	avatarServer := http.StripPrefix("/uploads/avatars/", http.FileServer(http.Dir(uploadsDir+"/avatars")))
+	r.Handle("/uploads/avatars/*", avatarServer)
 
 	r.Route("/api", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
@@ -80,7 +84,6 @@ func New(deps Deps) http.Handler {
 		r.Get("/courses/{id}", deps.CourseHandler.Get)                             // xem chi tiết khóa học, public
 		r.Get("/courses/{courseId}/chapters", deps.CurriculumHandler.ListChapters) // US2.2, public
 		r.Get("/chapters/{chapterId}/lessons", deps.CurriculumHandler.ListLessons) // US2.2, public
-		r.Get("/lessons/{id}/materials", deps.MaterialHandler.List)                // US4.2, public
 		r.Get("/courses/{id}/forum-posts", deps.ForumHandler.List)                 // US6.1, public
 
 		// OptionalAuth: route public nhưng cần biết vai trò người gọi để ẩn
@@ -101,6 +104,9 @@ func New(deps Deps) http.Handler {
 			r.Patch("/me", deps.AuthHandler.UpdateMe)                        // US1.4
 			r.Post("/me/avatar", deps.AuthHandler.UploadAvatar)              // US1.4
 			r.Post("/auth/change-password", deps.AuthHandler.ChangePassword) // US1.5
+
+			r.Get("/lessons/{id}/materials", deps.MaterialHandler.List)      // US4.2/US4.3, cần đăng nhập + kiểm tra quyền
+			r.Get("/materials/{id}/download", deps.MaterialHandler.Download) // US4.3, cần đăng nhập + kiểm tra quyền
 
 			r.Get("/notifications", deps.NotificationHandler.ListMine)                 // US6.2
 			r.Get("/notifications/unread-count", deps.NotificationHandler.UnreadCount) // US6.2

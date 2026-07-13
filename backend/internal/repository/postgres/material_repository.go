@@ -2,11 +2,13 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"educonnect-lms/backend/internal/domain/material"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -30,6 +32,23 @@ func (r *MaterialRepository) Create(ctx context.Context, m *material.Material) e
 	}
 	m.SetID(id)
 	return nil
+}
+
+func (r *MaterialRepository) FindByID(ctx context.Context, id uint) (*material.Material, error) {
+	const q = `SELECT id, lesson_id, file_name, file_path, uploaded_at FROM materials WHERE id = $1`
+	var (
+		mID, lID           uint
+		fileName, filePath string
+		uploadedAt         time.Time
+	)
+	err := r.pool.QueryRow(ctx, q, id).Scan(&mID, &lID, &fileName, &filePath, &uploadedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, material.ErrNotFound
+		}
+		return nil, fmt.Errorf("postgres: đọc dữ liệu material lỗi: %w", err)
+	}
+	return material.Rehydrate(mID, lID, fileName, filePath, uploadedAt), nil
 }
 
 func (r *MaterialRepository) ListByLesson(ctx context.Context, lessonID uint) ([]*material.Material, error) {

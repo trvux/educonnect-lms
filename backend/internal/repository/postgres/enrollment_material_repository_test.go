@@ -83,4 +83,12 @@ func TestMaterialRepository(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	assert.Equal(t, "slide.pdf", list[0].FileName())
+
+	found, err := materialRepo.FindByID(ctx, m.ID())
+	require.NoError(t, err)
+	assert.Equal(t, "slide.pdf", found.FileName())
+	assert.Equal(t, l.ID(), found.LessonID())
+
+	_, err = materialRepo.FindByID(ctx, 999999)
+	assert.ErrorIs(t, err, material.ErrNotFound)
 }
