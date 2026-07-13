@@ -25,6 +25,7 @@ type MaterialService interface {
 	Upload(ctx context.Context, lessonID uint, fileName string, content io.Reader) (*material.Material, error)
 	ListByLesson(ctx context.Context, lessonID, userID uint, role user.Role) ([]*material.Material, error)
 	Get(ctx context.Context, materialID, userID uint, role user.Role) (*material.Material, error)
+	Delete(ctx context.Context, materialID, userID uint, role user.Role) error
 }
 
 type MaterialHandler struct {
@@ -152,6 +153,26 @@ func (h *MaterialHandler) Download(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, m.FileName()))
 	http.ServeContent(w, r, m.FileName(), info.ModTime(), f)
+}
+
+// Delete xử lý DELETE /api/materials/{id} (US4.8, chỉ GV sở hữu khóa học
+// hoặc admin — học viên không bao giờ được xóa).
+func (h *MaterialHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.ClaimsFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "thiếu thông tin xác thực")
+		return
+	}
+	materialID, err := parseUintParam(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "material id không hợp lệ")
+		return
+	}
+	if err := h.service.Delete(r.Context(), materialID, claims.UserID, claims.Role); err != nil {
+		h.handleError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, nil)
 }
 
 func (h *MaterialHandler) handleError(w http.ResponseWriter, err error) {

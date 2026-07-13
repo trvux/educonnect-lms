@@ -94,13 +94,29 @@ func (r *fakeMaterialRepo) ListByLesson(_ context.Context, lessonID uint) ([]*ma
 	}
 	return out, nil
 }
+func (r *fakeMaterialRepo) Delete(_ context.Context, id uint) error {
+	for i, m := range r.items {
+		if m.ID() == id {
+			r.items = append(r.items[:i], r.items[i+1:]...)
+			return nil
+		}
+	}
+	return material.ErrNotFound
+}
 
-type fakeStorage struct{ savedPath string }
+type fakeStorage struct {
+	savedPath   string
+	deletedPath string
+}
 
 func (s *fakeStorage) Save(_ context.Context, subdir, fileName string, content io.Reader) (string, error) {
 	_, _ = io.ReadAll(content) // giả lập ghi file, không cần lưu thật trong test
 	s.savedPath = subdir + "/" + fileName
 	return s.savedPath, nil
+}
+func (s *fakeStorage) Delete(_ context.Context, path string) error {
+	s.deletedPath = path
+	return nil
 }
 
 // setupCourse dựng course(teacherID=1) -> chapter -> lesson, kèm 1 học viên
@@ -196,6 +212,44 @@ func TestService_Get_AccessControl(t *testing.T) {
 
 	_, err = svc.Get(ctx, m.ID(), 3, user.RoleStudent)
 	assert.ErrorIs(t, err, material.ErrNotFound, "học viên chưa đăng ký không được tải")
+}
+
+func TestService_Delete_ManagerOnly(t *testing.T) {
+	lessons, chapters, courses, enrollments, lessonID := setupCourse(t)
+	materials := &fakeMaterialRepo{}
+	storage := &fakeStorage{}
+	svc := materialservice.NewService(materials, lessons, chapters, courses, enrollments, storage)
+	ctx := context.Background()
+
+	m, err := svc.Upload(ctx, lessonID, "slide.pdf", bytes.NewBufferString("x"))
+	require.NoError(t, err)
+
+	// Học viên đã đăng ký (userID=2) KHÔNG được xóa dù xem/tải được (US4.8).
+	err = svc.Delete(ctx, m.ID(), 2, user.RoleStudent)
+	assert.ErrorIs(t, err, material.ErrNotFound, "học viên không bao giờ được xóa tài liệu")
+
+	// Giảng viên không sở hữu khóa học không được xóa.
+	err = svc.Delete(ctx, m.ID(), 999, user.RoleTeacher)
+	assert.ErrorIs(t, err, material.ErrNotFound)
+
+	// Giảng viên sở hữu khóa học xóa được — cả file vật lý lẫn metadata.
+	require.NoError(t, svc.Delete(ctx, m.ID(), 1, user.RoleTeacher))
+	assert.Equal(t, m.FilePath(), storage.deletedPath, "phải gọi storage.Delete đúng đường dẫn file")
+
+	_, err = materials.FindByID(ctx, m.ID())
+	assert.ErrorIs(t, err, material.ErrNotFound, "metadata phải bị xóa khỏi repository")
+}
+
+func TestService_Delete_AdminAlwaysAllowed(t *testing.T) {
+	lessons, chapters, courses, enrollments, lessonID := setupCourse(t)
+	materials := &fakeMaterialRepo{}
+	svc := materialservice.NewService(materials, lessons, chapters, courses, enrollments, &fakeStorage{})
+	ctx := context.Background()
+
+	m, err := svc.Upload(ctx, lessonID, "slide.pdf", bytes.NewBufferString("x"))
+	require.NoError(t, err)
+
+	require.NoError(t, svc.Delete(ctx, m.ID(), 999, user.RoleAdmin))
 }
 
 func mustLesson(t *testing.T, id uint) *curriculum.Lesson {

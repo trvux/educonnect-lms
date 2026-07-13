@@ -91,4 +91,12 @@ func TestMaterialRepository(t *testing.T) {
 
 	_, err = materialRepo.FindByID(ctx, 999999)
 	assert.ErrorIs(t, err, material.ErrNotFound)
+
+	// US4.8
+	require.NoError(t, materialRepo.Delete(ctx, m.ID()))
+	_, err = materialRepo.FindByID(ctx, m.ID())
+	assert.ErrorIs(t, err, material.ErrNotFound, "material phải bị xóa thật")
+
+	err = materialRepo.Delete(ctx, m.ID())
+	assert.ErrorIs(t, err, material.ErrNotFound, "xóa lần 2 phải báo không tìm thấy")
 }

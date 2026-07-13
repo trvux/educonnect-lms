@@ -75,3 +75,14 @@ func (r *MaterialRepository) ListByLesson(ctx context.Context, lessonID uint) ([
 	}
 	return result, rows.Err()
 }
+
+func (r *MaterialRepository) Delete(ctx context.Context, id uint) error {
+	tag, err := r.pool.Exec(ctx, `DELETE FROM materials WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("postgres: xóa material lỗi: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return material.ErrNotFound
+	}
+	return nil
+}

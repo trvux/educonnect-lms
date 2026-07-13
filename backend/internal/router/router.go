@@ -133,6 +133,7 @@ func New(deps Deps) http.Handler {
 				r.Patch("/lessons/{id}", deps.CurriculumHandler.RenameLesson)                // US4.6
 				r.Delete("/lessons/{id}", deps.CurriculumHandler.DeleteLesson)               // US4.6
 				r.Post("/lessons/{id}/materials", deps.MaterialHandler.Upload)               // US4.1
+				r.Delete("/materials/{id}", deps.MaterialHandler.Delete)                     // US4.8
 				r.Post("/lessons/{id}/assignments", deps.AssignmentHandler.Create)           // US5.1
 
 				r.Get("/assignments/{id}/submissions", deps.SubmissionHandler.ListByAssignment) // US5.3

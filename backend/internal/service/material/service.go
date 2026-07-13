@@ -1,6 +1,7 @@
 // Package material là service layer của US4.1 (upload) / US4.2 (xem) và
 // US4.3 (bảo vệ truy cập): chỉ học viên đã đăng ký khóa học, giảng viên sở
-// hữu khóa học, hoặc quản trị viên mới được xem/tải tài liệu.
+// hữu khóa học, hoặc quản trị viên mới được xem/tải tài liệu. US4.8: giảng
+// viên sở hữu khóa học (hoặc admin) xóa được tài liệu đã upload nhầm.
 package material
 
 import (
@@ -18,6 +19,7 @@ import (
 // internal/platform/storage (local disk cho bản demo).
 type FileStorage interface {
 	Save(ctx context.Context, subdir, fileName string, content io.Reader) (path string, err error)
+	Delete(ctx context.Context, path string) error
 }
 
 // CourseGetter là tập con method của course.Repository (US4.3: xác nhận
@@ -112,6 +114,28 @@ func (s *Service) Get(ctx context.Context, materialID, userID uint, role user.Ro
 	return m, nil
 }
 
+// Delete hiện thực US4.8: xóa cả file vật lý lẫn metadata. Khác với
+// ListByLesson/Get (học viên đã đăng ký cũng xem/tải được), xóa chỉ dành
+// cho giảng viên sở hữu khóa học hoặc admin — học viên không bao giờ được
+// xóa dù có đăng ký hay không.
+func (s *Service) Delete(ctx context.Context, materialID, userID uint, role user.Role) error {
+	m, err := s.materials.FindByID(ctx, materialID)
+	if err != nil {
+		return err
+	}
+	allowed, err := s.isManagerOfLesson(ctx, m.LessonID(), userID, role)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return material.ErrNotFound // không tiết lộ tài liệu của khóa học người khác tồn tại
+	}
+	if err := s.storage.Delete(ctx, m.FilePath()); err != nil {
+		return err
+	}
+	return s.materials.Delete(ctx, materialID)
+}
+
 // canAccessLesson hiện thực US4.3: admin luôn được phép; giảng viên chỉ
 // được phép nếu sở hữu khóa học chứa lesson; học viên chỉ được phép nếu đã
 // đăng ký khóa học đó.
@@ -119,24 +143,43 @@ func (s *Service) canAccessLesson(ctx context.Context, lessonID, userID uint, ro
 	if role == user.RoleAdmin {
 		return true, nil
 	}
-
-	l, err := s.lessons.FindByID(ctx, lessonID)
+	c, err := s.courseForLesson(ctx, lessonID)
 	if err != nil {
 		return false, err
 	}
-	ch, err := s.chapters.FindByID(ctx, l.ChapterID())
-	if err != nil {
-		return false, err
-	}
-	c, err := s.courses.FindByID(ctx, ch.CourseID())
-	if err != nil {
-		return false, err
-	}
-
 	if role == user.RoleTeacher {
 		return c.TeacherID() == userID, nil
 	}
 	return s.enrollments.IsEnrolled(ctx, userID, c.ID())
+}
+
+// isManagerOfLesson: admin hoặc giảng viên sở hữu khóa học — KHÔNG bao gồm
+// học viên dù đã đăng ký, dùng riêng cho các thao tác quản trị như Delete
+// (US4.8) mà học viên không bao giờ được phép thực hiện.
+func (s *Service) isManagerOfLesson(ctx context.Context, lessonID, userID uint, role user.Role) (bool, error) {
+	if role == user.RoleAdmin {
+		return true, nil
+	}
+	if role != user.RoleTeacher {
+		return false, nil
+	}
+	c, err := s.courseForLesson(ctx, lessonID)
+	if err != nil {
+		return false, err
+	}
+	return c.TeacherID() == userID, nil
+}
+
+func (s *Service) courseForLesson(ctx context.Context, lessonID uint) (*course.Course, error) {
+	l, err := s.lessons.FindByID(ctx, lessonID)
+	if err != nil {
+		return nil, err
+	}
+	ch, err := s.chapters.FindByID(ctx, l.ChapterID())
+	if err != nil {
+		return nil, err
+	}
+	return s.courses.FindByID(ctx, ch.CourseID())
 }
 
 func lessonSubdir(lessonID uint) string {

@@ -32,3 +32,9 @@ export async function downloadMaterial(materialId: number, fileName: string) {
   a.remove();
   URL.revokeObjectURL(blobUrl);
 }
+
+// US4.8 — chỉ giảng viên sở hữu khóa học/admin xóa được (kiểm tra thật ở
+// backend); học viên không bao giờ thấy nút xóa (canManage ở FE).
+export async function deleteMaterial(materialId: number) {
+  await apiClient.delete(`/materials/${materialId}`);
+}

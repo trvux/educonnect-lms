@@ -15,8 +15,8 @@ import {
   renameLesson,
   deleteLesson,
 } from "@/lib/api/curriculum";
-import { listMaterials, uploadMaterial, downloadMaterial } from "@/lib/api/materials";
-import type { Chapter, Lesson, MaterialFileType } from "@/lib/types";
+import { listMaterials, uploadMaterial, downloadMaterial, deleteMaterial } from "@/lib/api/materials";
+import type { Chapter, Lesson, Material, MaterialFileType } from "@/lib/types";
 import { AssignmentsSection } from "./assignments-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -398,6 +398,7 @@ function LessonsSection({ chapterId, canManage }: { chapterId: number; canManage
 
 function MaterialsList({ lessonId, canManage }: { lessonId: number; canManage: boolean }) {
   const queryClient = useQueryClient();
+  const [deleteTarget, setDeleteTarget] = useState<Material | null>(null);
 
   const { data: materials } = useQuery({
     queryKey: ["materials", lessonId],
@@ -423,20 +424,45 @@ function MaterialsList({ lessonId, canManage }: { lessonId: number; canManage: b
     onError: () => toast.error("Tải tài liệu thất bại, vui lòng thử lại"),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteMaterial(deleteTarget!.id),
+    onSuccess: () => {
+      toast.success("Đã xóa tài liệu");
+      setDeleteTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["materials", lessonId] });
+    },
+    onError: () => {
+      toast.error("Xóa tài liệu thất bại");
+      setDeleteTarget(null);
+    },
+  });
+
   return (
     <div className="mt-2 flex flex-col gap-2">
       {materials?.map((m) => (
-        <button
-          key={m.id}
-          type="button"
-          onClick={() => downloadMutation.mutate({ id: m.id, fileName: m.file_name })}
-          disabled={downloadMutation.isPending}
-          className="flex w-fit items-center gap-2 text-sm text-primary hover:underline disabled:opacity-50"
-        >
-          <DownloadIcon className="size-4" />
-          {m.file_name}
-          <Badge variant="secondary">{fileTypeLabel[m.file_type]}</Badge>
-        </button>
+        <div key={m.id} className="flex w-full items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => downloadMutation.mutate({ id: m.id, fileName: m.file_name })}
+            disabled={downloadMutation.isPending}
+            className="flex min-w-0 items-center gap-2 text-sm text-primary hover:underline disabled:opacity-50"
+          >
+            <DownloadIcon className="size-4 shrink-0" />
+            <span className="truncate">{m.file_name}</span>
+            <Badge variant="secondary">{fileTypeLabel[m.file_type]}</Badge>
+          </button>
+          {canManage && (
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Xóa tài liệu"
+              onClick={() => setDeleteTarget(m)}
+            >
+              <TrashIcon className="size-4" />
+            </Button>
+          )}
+        </div>
       ))}
       {materials?.length === 0 && (
         <p className="text-sm text-muted-foreground">Chưa có tài liệu.</p>
@@ -459,6 +485,21 @@ function MaterialsList({ lessonId, canManage }: { lessonId: number; canManage: b
           />
         </label>
       )}
+
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xóa tài liệu &quot;{deleteTarget?.file_name}&quot;?</AlertDialogTitle>
+            <AlertDialogDescription>Hành động này không thể hoàn tác.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
+              Xóa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -110,4 +110,5 @@ type Repository interface {
 	Create(ctx context.Context, m *Material) error
 	FindByID(ctx context.Context, id uint) (*Material, error)
 	ListByLesson(ctx context.Context, lessonID uint) ([]*Material, error)
+	Delete(ctx context.Context, id uint) error
 }
