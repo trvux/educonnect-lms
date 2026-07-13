@@ -12,7 +12,9 @@ import {
   createLesson,
 } from "@/lib/api/curriculum";
 import { listMaterials, uploadMaterial, downloadMaterial } from "@/lib/api/materials";
+import type { MaterialFileType } from "@/lib/types";
 import { AssignmentsSection } from "./assignments-section";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,6 +31,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+
+// US4.4 — whitelist định dạng file, khớp danh sách backend chấp nhận
+// (internal/domain/material/material.go#extensionToFileType). Thuộc tính
+// accept chỉ là gợi ý UX (lọc bớt lựa chọn trong hộp thoại chọn file);
+// validation thật vẫn nằm ở backend.
+const ACCEPTED_FILE_EXTENSIONS =
+  ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.mp4,.webm,.mov";
+
+const fileTypeLabel: Record<MaterialFileType, string> = {
+  pdf: "PDF",
+  doc: "Word",
+  excel: "Excel",
+  ppt: "PowerPoint",
+  video: "Video",
+};
 
 // US2.2 (chương/bài học) + US4.1/US4.2 (tài liệu). Mobile-first: mỗi chương
 // là 1 Accordion item để tiết kiệm không gian màn hình nhỏ; bài học/tài
@@ -185,7 +202,12 @@ function MaterialsList({ lessonId, canManage }: { lessonId: number; canManage: b
       toast.success("Tải tài liệu lên thành công");
       queryClient.invalidateQueries({ queryKey: ["materials", lessonId] });
     },
-    onError: () => toast.error("Tải tài liệu lên thất bại"),
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+        "Tải tài liệu lên thất bại";
+      toast.error(message);
+    },
   });
 
   const downloadMutation = useMutation({
@@ -205,6 +227,7 @@ function MaterialsList({ lessonId, canManage }: { lessonId: number; canManage: b
         >
           <DownloadIcon className="size-4" />
           {m.file_name}
+          <Badge variant="secondary">{fileTypeLabel[m.file_type]}</Badge>
         </button>
       ))}
       {materials?.length === 0 && (
@@ -217,6 +240,7 @@ function MaterialsList({ lessonId, canManage }: { lessonId: number; canManage: b
           {uploadMutation.isPending ? "Đang tải lên..." : "Upload tài liệu"}
           <input
             type="file"
+            accept={ACCEPTED_FILE_EXTENSIONS}
             className="hidden"
             disabled={uploadMutation.isPending}
             onChange={(e) => {

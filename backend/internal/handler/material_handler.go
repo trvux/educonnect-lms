@@ -45,10 +45,17 @@ type materialResponse struct {
 	LessonID uint   `json:"lesson_id"`
 	FileName string `json:"file_name"`
 	FilePath string `json:"file_path"`
+	FileType string `json:"file_type"`
 }
 
 func toMaterialResponse(m *material.Material) materialResponse {
-	return materialResponse{ID: m.ID(), LessonID: m.LessonID(), FileName: m.FileName(), FilePath: m.FilePath()}
+	return materialResponse{
+		ID:       m.ID(),
+		LessonID: m.LessonID(),
+		FileName: m.FileName(),
+		FilePath: m.FilePath(),
+		FileType: string(m.FileType()),
+	}
 }
 
 // Upload xử lý POST /api/lessons/{id}/materials, multipart/form-data với
@@ -151,7 +158,7 @@ func (h *MaterialHandler) handleError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, curriculum.ErrLessonNotFound), errors.Is(err, material.ErrNotFound):
 		writeError(w, http.StatusNotFound, "không tìm thấy hoặc bạn không có quyền truy cập")
-	case errors.Is(err, material.ErrEmptyFileName), errors.Is(err, material.ErrInvalidLessonID):
+	case errors.Is(err, material.ErrEmptyFileName), errors.Is(err, material.ErrInvalidLessonID), errors.Is(err, material.ErrUnsupportedFileType):
 		writeError(w, http.StatusBadRequest, err.Error())
 	default:
 		h.log.Error("material handler: lỗi không xác định", zap.Error(err))

@@ -22,11 +22,14 @@ export type Lesson = {
   position: number;
 };
 
+export type MaterialFileType = "pdf" | "doc" | "excel" | "ppt" | "video";
+
 export type Material = {
   id: number;
   lesson_id: number;
   file_name: string;
   file_path: string;
+  file_type: MaterialFileType;
 };
 
 export type EnrolledStudent = {
