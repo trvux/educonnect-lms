@@ -19,6 +19,7 @@ import (
 	curriculumservice "educonnect-lms/backend/internal/service/curriculum"
 	enrollmentservice "educonnect-lms/backend/internal/service/enrollment"
 	materialservice "educonnect-lms/backend/internal/service/material"
+	submissionservice "educonnect-lms/backend/internal/service/submission"
 
 	"go.uber.org/zap"
 )
@@ -50,6 +51,7 @@ func main() {
 	enrollmentRepo := postgres.NewEnrollmentRepository(pool)
 	materialRepo := postgres.NewMaterialRepository(pool)
 	assignmentRepo := postgres.NewAssignmentRepository(pool)
+	submissionRepo := postgres.NewSubmissionRepository(pool)
 	hasher := security.NewBcryptHasher()
 	tokens := security.NewJWTIssuer(cfg.JWTSecret, 24*time.Hour)
 	fileStorage, err := storage.NewLocalFileStorage("uploads")
@@ -64,6 +66,7 @@ func main() {
 	enrollmentSvc := enrollmentservice.NewService(enrollmentRepo, courseRepo, userRepo)
 	materialSvc := materialservice.NewService(materialRepo, lessonRepo, fileStorage)
 	assignmentSvc := assignmentservice.NewService(assignmentRepo, lessonRepo)
+	submissionSvc := submissionservice.NewService(submissionRepo, assignmentSvc)
 
 	// tầng HTTP
 	authHandler := handler.NewAuthHandler(authSvc, log)
@@ -72,6 +75,7 @@ func main() {
 	enrollmentHandler := handler.NewEnrollmentHandler(enrollmentSvc, log)
 	materialHandler := handler.NewMaterialHandler(materialSvc, log)
 	assignmentHandler := handler.NewAssignmentHandler(assignmentSvc, log)
+	submissionHandler := handler.NewSubmissionHandler(submissionSvc, log)
 
 	r := router.New(router.Deps{
 		AuthHandler:       authHandler,
@@ -80,6 +84,7 @@ func main() {
 		EnrollmentHandler: enrollmentHandler,
 		MaterialHandler:   materialHandler,
 		AssignmentHandler: assignmentHandler,
+		SubmissionHandler: submissionHandler,
 		TokenVerifier:     tokens,
 		UploadsDir:        "uploads",
 	})
